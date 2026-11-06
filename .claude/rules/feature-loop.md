@@ -45,8 +45,12 @@ iteration does **one** feature. Loop again for the next. See `AGENTS.md` for the
 
 ### 1. Discover — what needs doing
 
+**Pull first** (`git switch main && git pull --ff-only`), even for a quick fix: the rules in
+`.claude/rules/` only protect you if you have the latest ones.
+
 ```bash
-H=$(cat .fagdag/harness-url) TEAM=$(cat .fagdag/team) TOKEN=$(cat .fagdag/harness-token)
+# tr strips the CR that Windows/WSL checkouts leave in these files (cat would break the URL)
+H=$(tr -d '\r\n' < .fagdag/harness-url); TEAM=$(tr -d '\r\n' < .fagdag/team); TOKEN=$(tr -d '\r\n' < .fagdag/harness-token)
 # released specs (feature slugs):
 curl -fsS -H "Authorization: Bearer $TOKEN" "$H/specs" | grep -oE '/specs/[a-z0-9-]+' | sort -u
 # current state of every feature/check:
@@ -119,8 +123,11 @@ leave the branch local for a person to review and merge (merging to `main` is wh
 - Write a short **decision block** (in the test report, and as comments where the rules live): the
   status codes, edge cases and error handling the spec leaves open. Cross-check numbers against the
   spec, not the stale base `README.md` (e.g. the submission limit is **3**, not the README's "5").
-- Extract a **requirements checklist**: one line per rule the spec states, each testable. This list
-  drives steps 6–7 and the coverage table in the report.
+- Build the **requirements table** (`house-conventions.md` §1A): one row per rule the spec states, *plus*
+  the rows the conventions add when the spec is silent (unknown path id, bad body and wrong types,
+  repeats, every invariant under concurrency, and each earlier requirement on a shared shape it
+  touches). Open behaviour is decided by the conventions, then by mirroring the nearest accepted
+  endpoint, and marked *decided*. This table drives steps 6–7 and the coverage table in the report.
 
 ### 4. Plan — mirror the existing shape
 
@@ -169,8 +176,10 @@ fields are additive). If Hurl is installed, also run `examples/run.sh` against a
 
 ### 8. Regression review — don't break earlier specs
 
-Start with `.claude/rules/house-conventions.md`: status-code precedence, no session-level `SET` or
-`isolation` (the 14:07 incident), concurrency tests for every limit. Check the change against each rule.
+**First, the independent requirements review** (`house-conventions.md` §1B): spawn a fresh reviewer agent
+with only the spec(s), the diff, `house-conventions.md` and the test names, not your table or conclusions.
+It lists the requirements it finds (covered/not covered, with test and file:line) and any violation of the
+conventions. Diff its list against your table; fix every gap or record it as *decided* with the reason.
 
 A new feature must not violate any requirement of a feature that is already done. Running the old tests
 (step 7) is necessary but not sufficient — they only catch what they already assert. After the build is
@@ -204,10 +213,10 @@ Emit a report in this shape:
 Decisions (rules the request left open):
 - <case> -> <status code / behaviour>
 
-Requirement coverage:
-| # | Spec requirement            | Test(s)                         | Result |
-|---|-----------------------------|---------------------------------|--------|
-| 1 | <rule from spec>            | <FeatureTest#method / hurl>     | PASS   |
+Requirement coverage (house-conventions §1A table, merged with the independent review §1B):
+| # | Requirement            | Kind | Behaviour   | Test(s)                     | Reviewer | Result |
+|---|------------------------|------|-------------|-----------------------------|----------|--------|
+| 1 | <rule from spec>       | rule | 201         | <FeatureTest#method / hurl> | covered  | PASS   |
 | ...                                                                              |
 
 Build: ./mvnw package -> SUCCESS (N tests, 0 failures)   [or the failure output]
@@ -219,7 +228,8 @@ REVIEW.md: claim-log row [+ harness-fault entry] appended via workflow/review-lo
 Files changed: <list>
 Open questions for the product owner: <none | …>
 
-Pre-claim gate (house-conventions.md): after deploy, run.sh + adversarial cases green against the deployed URL, no new 500s
+Independent review: <n> requirements found by the reviewer; gaps [<none | fixed: … | decided: …>]
+Pre-claim gate (house-conventions §1C, after deploy): run.sh + every error/repeat/invariant row green against the deployed URL, no new 500s
 Status: on branch feature/<slug>, ready for a person to review, merge to main (which deploys) and claim
 on the harness — agents can't merge, deploy or claim.
 Evidence: passing tests above + (once deployed) green harness checks for <slug>.
