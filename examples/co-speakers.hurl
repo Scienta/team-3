@@ -81,7 +81,7 @@ HTTP 409
 
 # The main speaker cannot be a co-speaker of their own talk
 PUT {{base_url}}/talks/{{talk_id}}/co-speakers/{{main_id}}
-HTTP 409
+HTTP 400
 
 # A co-speaker who isn't a registered speaker: not found
 PUT {{base_url}}/talks/{{talk_id}}/co-speakers/99999999
@@ -120,8 +120,11 @@ HTTP 200
 jsonpath "$.coSpeakerIds" count == 1
 jsonpath "$.coSpeakerIds[0]" == {{co2_id}}
 
-# Removing someone who isn't a co-speaker is a no-op (idempotent)
+# Removing someone who isn't a co-speaker (any more) is not found, and changes nothing
 DELETE {{base_url}}/talks/{{talk_id}}/co-speakers/{{co1_id}}
+HTTP 404
+
+GET {{base_url}}/talks/{{talk_id}}
 HTTP 200
 [Asserts]
 jsonpath "$.coSpeakerIds" count == 1
@@ -129,4 +132,4 @@ jsonpath "$.coSpeakerIds[0]" == {{co2_id}}
 
 # Now the main speaker can add themselves? No: still rejected, main speaker is never a co-speaker
 PUT {{base_url}}/talks/{{talk_id}}/co-speakers/{{main_id}}
-HTTP 409
+HTTP 400

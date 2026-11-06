@@ -260,7 +260,7 @@ public class ConferenceService {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "speaker not found");
             }
             if (mainSpeakerId == speakerId) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "the main speaker cannot be a co-speaker");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "the main speaker cannot be a co-speaker");
             }
             if (current.size() >= 2) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "a talk can have at most two co-speakers");
@@ -278,7 +278,9 @@ public class ConferenceService {
         if (!speakerDao.exists(speakerId)) {                 // same as adding: an unknown speaker is a 404
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "speaker not found");
         }
-        coSpeakerDao.delete(talkId, speakerId);              // idempotent: a no-op if not a co-speaker
+        if (coSpeakerDao.delete(talkId, speakerId) == 0) {   // not a co-speaker (any more): 404
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "speaker is not a co-speaker of this talk");
+        }
         return getTalk(talkId);
     }
 

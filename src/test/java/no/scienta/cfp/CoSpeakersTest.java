@@ -78,14 +78,17 @@ class CoSpeakersTest {
     }
 
     @Test
-    void removingSomeoneWhoIsNotACoSpeakerIsANoOp() throws Exception {
+    void removingSomeoneWhoIsNotACoSpeakerIsNotFound() throws Exception {
         long main = newSpeaker();
+        long co1 = newSpeaker();
         long other = newSpeaker();
         long talk = newTalk(main);
+        put("/talks/" + talk + "/co-speakers/" + co1);
 
-        HttpResponse<String> del = delete("/talks/" + talk + "/co-speakers/" + other);
-        assertEquals(200, del.statusCode(), del.body());
-        assertEquals(List.of(), coSpeakerIds(del.body()));
+        assertEquals(404, delete("/talks/" + talk + "/co-speakers/" + other).statusCode());
+        assertEquals(200, delete("/talks/" + talk + "/co-speakers/" + co1).statusCode());
+        assertEquals(404, delete("/talks/" + talk + "/co-speakers/" + co1).statusCode());   // already removed
+        assertEquals(List.of(), coSpeakerIds(get("/talks/" + talk)));
     }
 
     @Test
@@ -94,7 +97,8 @@ class CoSpeakersTest {
         long talk = newTalk(main);
 
         HttpResponse<String> res = put("/talks/" + talk + "/co-speakers/" + main);
-        assertEquals(409, res.statusCode(), res.body());
+        assertEquals(400, res.statusCode(), res.body());
+        assertEquals(List.of(), coSpeakerIds(get("/talks/" + talk)));
     }
 
     @Test
