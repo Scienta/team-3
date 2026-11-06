@@ -183,7 +183,38 @@ class SchedulingTest {
         assertEquals(1, ok, "exactly one of the clashing placements may win");
     }
 
+    // Regression (Step 8): scheduling and workshop-registration both touch workshops but share no state —
+    // placing/removing a workshop on the programme must not disturb its registrations, or vice versa.
+    @Test
+    void schedulingDoesNotDisturbWorkshopRegistrations() throws Exception {
+        long ws = acceptedTalk("WORKSHOP");
+        register(ws, "Ada", "ada-" + UUID.randomUUID() + "@example.com");
+        register(ws, "Grace", "grace-" + UUID.randomUUID() + "@example.com");
+        assertEquals(2, registrationCount(ws));
+
+        assertEquals(200, put("R1", "S4", ws).statusCode());   // schedule it (workshop -> long slot)
+        assertEquals(2, registrationCount(ws));                // scheduling left registrations alone
+        assertEquals(String.valueOf(ws), field(get("R1", "S4").body(), "talkId"));
+
+        assertEquals(204, del("R1", "S4").statusCode());        // take it off the programme
+        assertEquals(2, registrationCount(ws));                // removal left registrations alone
+    }
+
     // ---------------------------------------------------------------- helpers
+
+    private void register(long workshopId, String name, String email) throws Exception {
+        HttpResponse<String> res = http.send(req("POST", "/workshops/" + workshopId + "/registrations",
+                "{\"name\":\"" + name + "\",\"email\":\"" + email + "\"}"), HttpResponse.BodyHandlers.ofString());
+        assertEquals(201, res.statusCode(), res.body());
+    }
+
+    @SuppressWarnings("unchecked")
+    private int registrationCount(long workshopId) throws Exception {
+        HttpResponse<String> res = http.send(req("GET", "/workshops/" + workshopId + "/registrations", null),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, res.statusCode(), res.body());
+        return om.readValue(res.body(), List.class).size();
+    }
 
     private long newSpeaker() throws Exception {
         HttpResponse<String> res = http.send(req("POST", "/speakers",
