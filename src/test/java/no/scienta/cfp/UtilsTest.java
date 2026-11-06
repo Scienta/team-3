@@ -68,4 +68,22 @@ class UtilsTest {
         f.setTimeZone(TimeZone.getTimeZone("UTC"));
         assertEquals(f.format(new Date()), Utils.now());
     }
+
+    // code review #4: /admin/stats mean of per-talk averages is exact (a double sum gave 1.5 for 1.01 and 2.09)
+    @Test
+    void meanRoundedIsExact() {
+        assertEquals(1.6, Utils.meanRounded(java.util.List.of(1.01, 2.09)));
+        assertEquals(4.3, Utils.meanRounded(java.util.List.of(4.25)));
+        assertEquals(null, Utils.meanRounded(java.util.List.of()));
+    }
+
+    // code review #5: semicolon CSV quotes ';', quotes and line breaks, doubling quotes, never changing the text
+    @Test
+    void csvQuotesOnlyWhenNeededAndKeepsTheText() {
+        assertEquals("plain, with comma", Utils.csv("plain, with comma"));
+        assertEquals("\"a;b\"", Utils.csv("a;b"));
+        assertEquals("\"say \"\"hi\"\"\"", Utils.csv("say \"hi\""));
+        assertEquals("\"two\nlines\"", Utils.csv("two\nlines"));
+        assertEquals("", Utils.csv(null));
+    }
 }

@@ -1,6 +1,5 @@
 package no.scienta.cfp;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,14 +34,12 @@ public class RatingDao {
         if (talkIds.isEmpty()) {
             return byTalk;
         }
-        String placeholders = String.join(",", Collections.nCopies(talkIds.size(), "?"));
         jdbc.query("SELECT talk_id, COUNT(*) AS cnt, SUM(score) AS total, MAX(score) AS hi, MIN(score) AS lo "
-                        + "FROM rating WHERE talk_id IN (" + placeholders
-                        + ") GROUP BY talk_id",
+                        + "FROM rating WHERE talk_id = ANY(?) GROUP BY talk_id",
+                SqlArrays.bigints(talkIds),
                 rs -> {
                     byTalk.put(rs.getLong("talk_id"), new long[] {rs.getLong("cnt"), rs.getLong("total"), rs.getLong("hi"), rs.getLong("lo")});
-                },
-                talkIds.toArray());
+                });
         return byTalk;
     }
 
