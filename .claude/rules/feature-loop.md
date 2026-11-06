@@ -54,7 +54,8 @@ curl -fsS -H "Authorization: Bearer $TOKEN" "$H/api/teams/$TEAM/feedback"
 ```
 
 Compare the two and build an **ordered list of candidates**, highest priority first:
-1. **FAULTY checks on a claimed feature** (regressions bleed points) — fix first.
+1. **FAULTY checks on a claimed feature** (regressions bleed points) — fix first. Grab it in the ledger
+   before fixing, like a feature (two of us once wrote the same fix at the same time).
 2. **A released, unclaimed feature with no checks passing** (new points).
 3. **A partially-passing feature** (finish it).
 
@@ -143,6 +144,9 @@ fields are additive). If Hurl is installed, also run `examples/run.sh` against a
 
 ### 8. Regression review — don't break earlier specs
 
+Start with `.claude/rules/house-conventions.md`: status-code precedence, no session-level `SET` or
+`isolation` (the 14:07 incident), concurrency tests for every limit. Check the change against each rule.
+
 A new feature must not violate any requirement of a feature that is already done. Running the old tests
 (step 7) is necessary but not sufficient — they only catch what they already assert. After the build is
 green, do an explicit read-through:
@@ -190,6 +194,7 @@ REVIEW.md: claim-log row [+ harness-fault entry] appended via workflow/review-lo
 Files changed: <list>
 Open questions for the product owner: <none | …>
 
+Pre-claim gate (house-conventions.md): after deploy, run.sh + adversarial cases green against the deployed URL, no new 500s
 Status: on branch feature/<slug>, ready for a person to review, merge to main (which deploys) and claim
 on the harness — agents can't merge, deploy or claim.
 Evidence: passing tests above + (once deployed) green harness checks for <slug>.
