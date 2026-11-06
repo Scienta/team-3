@@ -4,14 +4,16 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -57,6 +59,9 @@ public class ConferenceService {
 
     @Transactional
     public Map<String, Object> registerSpeaker(SpeakerForm form) {
+        if (!Utils.isValidEmail(form.getEmail())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid email");
+        }
         if (speakerDao.emailTaken(form.getEmail())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "email already registered");
         }
@@ -66,7 +71,7 @@ public class ConferenceService {
         } catch (DuplicateKeyException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "email already registered");
         }
-        log.info("registered speaker " + id + " (" + form.getEmail() + ")");
+        log.info("registered speaker {}", id);
         notifications.speakerRegistered(form.getEmail(), form.getName());
         Map<String, Object> speaker = new LinkedHashMap<>();
         speaker.put("id", id);
@@ -87,19 +92,23 @@ public class ConferenceService {
     @Transactional
     public Map<String, Object> updateSpeaker(long id, String name, String email, String bio) {
         Map<String, Object> existing = getSpeaker(id);
-        if (name == null || name.equals("")) {
+        if (Utils.isEmpty(name)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "name is required");
         }
         if (!Utils.isValidEmail(email)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid email");
         }
-        if (bio != null && bio.length() > 1000) {
+        if (bio != null && bio.length() > Utils.MAX_BIO) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bio too long");
         }
         if (!email.equalsIgnoreCase((String) existing.get("email")) && speakerDao.emailTaken(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "email already registered");
         }
-        speakerDao.update(id, name, email, bio);
+        try {
+            speakerDao.update(id, name, email, bio);
+        } catch (DuplicateKeyException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "email already registered");
+        }
         return getSpeaker(id);
     }
 
@@ -127,36 +136,17 @@ public class ConferenceService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "speaker " + form.speakerId + " does not exist");
         }
 
-        int duration;
-        switch (form.format) {
-            case "LIGHTNING_10":
-                duration = 10;
-                break;
-            case "LIGHTNING_20":
-                duration = 20;
-                break;
-            case "WORKSHOP":
-                duration = 120;
-                break;
-            default:
-                duration = 45;
-        }
+        int duration = DURATIONS.get(form.format);
 
-        Long id = checkSubmissionLimit(form, duration);
+        Long id = talkDao.insertIfBelow(Utils.MAX_TALKS, form.title, form.format, duration, form.level,
+                form.speakerId, System.currentTimeMillis());
         if (id == null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "a speaker can submit at most 3 talks");
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "a speaker can submit at most " + Utils.MAX_TALKS + " talks");
         }
         Map<String, Object> speaker = speakerDao.findById(form.speakerId);
         notifications.talkSubmitted((String) speaker.get("email"), form.title);
         return getTalk(id);
-    }
-
-    /**
-     * Checks that the speaker is below the limit of 3 talks.
-     */
-    private Long checkSubmissionLimit(TalkForm form, int duration) {
-        return talkDao.insertIfBelow(3, form.title, form.format, duration, form.level, form.speakerId,
-                System.currentTimeMillis());
     }
 
     public TalkDto getTalk(long id) {
@@ -164,7 +154,7 @@ public class ConferenceService {
         if (talk == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
         }
-        addRatings(talk);
+        addRatings(Collections.singletonList(talk));
         talk.coSpeakerIds = coSpeakerDao.findByTalk(id);
         return talk;
     }
@@ -174,9 +164,7 @@ public class ConferenceService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "speaker not found");
         }
         List<TalkDto> talks = talkDao.findBySpeaker(speakerId);
-        for (TalkDto t : talks) {
-            addRatings(t);
-        }
+        addRatings(talks);
         addCoSpeakers(talks);
         return talks;
     }
@@ -186,9 +174,7 @@ public class ConferenceService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sort must be 'rating'");
         }
         List<TalkDto> talks = speakerId == null ? talkDao.findAll() : talkDao.findBySpeaker(speakerId);
-        for (TalkDto t : talks) {
-            addRatings(t);
-        }
+        addRatings(talks);
         addCoSpeakers(talks);
         if ("rating".equals(sort)) {
             List<TalkDto> rated = new ArrayList<>();
@@ -217,12 +203,23 @@ public class ConferenceService {
         return talks;
     }
 
-    private void addRatings(TalkDto talk) {
-        Map<String, Object> stats = ratingDao.stats(talk.id);
-        int count = ((Number) stats.get("cnt")).intValue();
-        long total = ((Number) stats.get("total")).longValue();
-        talk.ratingCount = count;
-        talk.averageRating = count == 0 ? null : calculateAverage(total, count);
+    // Fills ratingCount and averageRating for a list of talks in one query, rather than one per talk.
+    private void addRatings(List<TalkDto> talks) {
+        Map<Long, long[]> byTalk = ratingDao.statsByTalks(ids(talks));
+        for (TalkDto t : talks) {
+            long[] stats = byTalk.get(t.id);
+            int count = stats == null ? 0 : (int) stats[0];
+            t.ratingCount = count;
+            t.averageRating = count == 0 ? null : calculateAverage(stats[1], count);
+        }
+    }
+
+    private static List<Long> ids(List<TalkDto> talks) {
+        List<Long> ids = new ArrayList<>();
+        for (TalkDto t : talks) {
+            ids.add(t.id);
+        }
+        return ids;
     }
 
     // 1 decimal, half up (4.25 -> 4.3)
@@ -233,32 +230,38 @@ public class ConferenceService {
 
     // Fills coSpeakerIds for a list of talks in one query, rather than one per talk (the pool is capped at 5).
     private void addCoSpeakers(List<TalkDto> talks) {
-        List<Long> ids = new ArrayList<>();
-        for (TalkDto t : talks) {
-            ids.add(t.id);
-        }
-        Map<Long, List<Long>> byTalk = coSpeakerDao.findByTalks(ids);
+        Map<Long, List<Long>> byTalk = coSpeakerDao.findByTalks(ids(talks));
         for (TalkDto t : talks) {
             t.coSpeakerIds = byTalk.getOrDefault(t.id, new ArrayList<>());
         }
+    }
+
+    /** Speaker names by id for a list of talks, in one query. Talks whose speaker is gone have no entry. */
+    public Map<Long, String> speakerNames(List<TalkDto> talks) {
+        Set<Long> ids = new LinkedHashSet<>();
+        for (TalkDto t : talks) {
+            ids.add(t.speakerId);
+        }
+        return speakerDao.findNames(ids);
     }
 
     // ---------------------------------------------------------------- co-speakers
 
     @Transactional
     public TalkDto addCoSpeaker(long talkId, long speakerId) {
-        if (!coSpeakerDao.lockTalk(talkId)) {
+        Long mainSpeakerId = coSpeakerDao.lockTalk(talkId);
+        if (mainSpeakerId == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
         }
-        if (!coSpeakerDao.exists(talkId, speakerId)) {       // repeat add changes nothing
+        List<Long> current = coSpeakerDao.findByTalk(talkId);
+        if (!current.contains(speakerId)) {                   // repeat add changes nothing
             if (!speakerDao.exists(speakerId)) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "speaker not found");
             }
-            TalkDto talk = talkDao.findById(talkId);
-            if (talk.speakerId == speakerId) {
+            if (mainSpeakerId == speakerId) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "the main speaker cannot be a co-speaker");
             }
-            if (coSpeakerDao.count(talkId) >= 2) {
+            if (current.size() >= 2) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "a talk can have at most two co-speakers");
             }
             coSpeakerDao.insert(talkId, speakerId);
@@ -268,7 +271,7 @@ public class ConferenceService {
 
     @Transactional
     public TalkDto removeCoSpeaker(long talkId, long speakerId) {
-        if (!coSpeakerDao.lockTalk(talkId)) {
+        if (coSpeakerDao.lockTalk(talkId) == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
         }
         coSpeakerDao.delete(talkId, speakerId);              // idempotent: a no-op if not a co-speaker
@@ -331,7 +334,6 @@ public class ConferenceService {
         Map<String, Integer> byFormat = new LinkedHashMap<>();
         Map<String, Integer> byLevel = new LinkedHashMap<>();
         Map<String, Integer> byStatus = new LinkedHashMap<>();
-        List<Long> speakersWithTalks = new ArrayList<>();
         int minutes = 0;
         double ratingSum = 0;
         int rated = 0;
@@ -339,9 +341,6 @@ public class ConferenceService {
             byFormat.put(t.format, byFormat.getOrDefault(t.format, 0) + 1);
             byLevel.put(t.level, byLevel.getOrDefault(t.level, 0) + 1);
             byStatus.put(t.status, byStatus.getOrDefault(t.status, 0) + 1);
-            if (!speakersWithTalks.contains(t.speakerId) && speakerDao.findById(t.speakerId) != null) {
-                speakersWithTalks.add(t.speakerId);
-            }
             minutes += t.durationMinutes;
             if (t.averageRating != null) {
                 ratingSum += t.averageRating;
@@ -350,12 +349,12 @@ public class ConferenceService {
         }
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("speakers", speakerDao.count());
-        stats.put("speakersWithTalks", speakersWithTalks.size());
+        stats.put("speakersWithTalks", talkDao.countSpeakersWithTalks());
         stats.put("talks", talks.size());
         stats.put("byFormat", byFormat);
         stats.put("byLevel", byLevel);
         stats.put("byStatus", byStatus);
-        stats.put("totalHours", minutes / 60);
+        stats.put("totalHours", minutes / 60.0);
         stats.put("averageRating", rated == 0 ? null : Utils.roundRating(ratingSum / rated));
         stats.put("generated", Utils.now());
         return stats;

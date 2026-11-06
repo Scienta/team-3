@@ -28,16 +28,16 @@ public class ReportController {
     @GetMapping("/admin/talks.csv")
     public ResponseEntity<String> talksCsv() {
         List<TalkDto> talks = service.listTalks(null, null);
+        Map<Long, String> speakerNames = service.speakerNames(talks);
         StringBuilder sb = new StringBuilder();
         sb.append("id;title;format;minutes;level;speaker;status;submitted;rating;ratings\n");
         for (TalkDto t : talks) {
-            Map<String, Object> speaker = service.getSpeaker(t.speakerId);
             sb.append(t.id).append(';')
                     .append(Utils.csv(t.title)).append(';')
                     .append(Utils.capitalize(t.format.replace("_", " "))).append(';')
                     .append(t.durationMinutes).append(';')
                     .append(Utils.capitalize(t.level)).append(';')
-                    .append(Utils.csv((String) speaker.get("name"))).append(';')
+                    .append(Utils.csv(speakerNames.get(t.speakerId))).append(';')
                     .append(t.status).append(';')
                     .append(Utils.norwegianDate(t.submittedAt)).append(';')
                     .append(t.averageRating == null ? "" : String.valueOf(t.averageRating).replace('.', ',')).append(';')

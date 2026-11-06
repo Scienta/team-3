@@ -1,5 +1,7 @@
 package no.scienta.cfp;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -14,7 +16,9 @@ public class Utils {
 
     public static final String DB_DATE_TIME = "yyyy-MM-dd HH:mm:ss";
 
-    public static final int MAX_TALKS = 5;
+    public static final int MAX_TALKS = 3;
+
+    public static final int MAX_BIO = 500;
 
     private static final TimeZone UTC = TimeZone.getTimeZone("UTC");
 
@@ -99,10 +103,10 @@ public class Utils {
     }
 
     /**
-     * Rounds a rating average to one decimal.
+     * Rounds a rating average to one decimal, halves up (4.25 -> 4.3), like the per-talk averages.
      */
     public static double roundRating(double avg) {
-        return Math.floor(avg * 10) / 10.0;
+        return BigDecimal.valueOf(avg).setScale(1, RoundingMode.HALF_UP).doubleValue();
     }
 
     public static String capitalize(String s) {

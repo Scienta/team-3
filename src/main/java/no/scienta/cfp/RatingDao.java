@@ -1,5 +1,8 @@
 package no.scienta.cfp;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -24,10 +27,22 @@ public class RatingDao {
     }
 
     /**
-     * Returns {cnt, total} for one talk.
+     * Returns {talkId: [cnt, total]} for several talks in one query, rather than one per talk (the pool is capped at
+     * 5). Talks nobody has rated are left out.
      */
-    public Map<String, Object> stats(long talkId) {
-        return jdbc.queryForMap("SELECT COUNT(*) AS cnt, COALESCE(SUM(score), 0) AS total FROM rating WHERE talk_id = ?", talkId);
+    public Map<Long, long[]> statsByTalks(List<Long> talkIds) {
+        Map<Long, long[]> byTalk = new HashMap<>();
+        if (talkIds.isEmpty()) {
+            return byTalk;
+        }
+        String placeholders = String.join(",", Collections.nCopies(talkIds.size(), "?"));
+        jdbc.query("SELECT talk_id, COUNT(*) AS cnt, SUM(score) AS total FROM rating WHERE talk_id IN (" + placeholders
+                        + ") GROUP BY talk_id",
+                rs -> {
+                    byTalk.put(rs.getLong("talk_id"), new long[] {rs.getLong("cnt"), rs.getLong("total")});
+                },
+                talkIds.toArray());
+        return byTalk;
     }
 
     /** How many different reviewers rated this talk (one reviewer who rated twice counts once). */

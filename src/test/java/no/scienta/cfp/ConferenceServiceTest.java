@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
@@ -71,6 +74,39 @@ class ConferenceServiceTest {
         when(speakerDao.emailTaken("ada@example.com")).thenReturn(true);
         ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.registerSpeaker(form));
         assertEquals(HttpStatus.CONFLICT, e.getStatus());
+    }
+
+    @Test
+    void invalidEmailIsRejectedOnRegistration() {
+        SpeakerForm form = new SpeakerForm();
+        form.setName("Ada");
+        form.setEmail("not-an-email");
+        ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.registerSpeaker(form));
+        assertEquals(HttpStatus.BAD_REQUEST, e.getStatus());
+    }
+
+    @Test
+    void emailTakenConcurrentlyOnUpdateIsConflict() {
+        Map<String, Object> existing = new HashMap<>();
+        existing.put("email", "ada@example.com");
+        when(speakerDao.findById(1L)).thenReturn(existing);
+        when(speakerDao.emailTaken("grace@example.com")).thenReturn(false);
+        when(speakerDao.update(1L, "Ada", "grace@example.com", null))
+                .thenThrow(new DuplicateKeyException("duplicate key value violates unique constraint"));
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.updateSpeaker(1L, "Ada", "grace@example.com", null));
+        assertEquals(HttpStatus.CONFLICT, e.getStatus());
+    }
+
+    @Test
+    void bioOver500IsRejectedOnUpdate() {
+        Map<String, Object> existing = new HashMap<>();
+        existing.put("email", "ada@example.com");
+        when(speakerDao.findById(1L)).thenReturn(existing);
+        String bio = new String(new char[Utils.MAX_BIO + 1]).replace('\0', 'x');
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.updateSpeaker(1L, "Ada", "ada@example.com", bio));
+        assertEquals(HttpStatus.BAD_REQUEST, e.getStatus());
     }
 
     private TalkForm form() {

@@ -14,7 +14,7 @@ public class SpeakerForm {
     @NotBlank
     private String email;
 
-    @Size(max = 500)
+    @Size(max = Utils.MAX_BIO)
     private String bio;
 
     // TODO twitter handle, see CFP-112

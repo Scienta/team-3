@@ -1,5 +1,8 @@
 package no.scienta.cfp;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -47,8 +50,25 @@ public class SpeakerDao {
         return jdbc.queryForObject("SELECT COUNT(*) FROM speaker", Integer.class);
     }
 
-    // Used by the old admin page to look people up.
+    /** Speaker names by id, in one query. Ids without a speaker are left out. */
+    public Map<Long, String> findNames(Collection<Long> ids) {
+        Map<Long, String> names = new HashMap<>();
+        if (ids.isEmpty()) {
+            return names;
+        }
+        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
+        jdbc.query("SELECT id, name FROM speaker WHERE id IN (" + placeholders + ")",
+                rs -> {
+                    names.put(rs.getLong("id"), rs.getString("name"));
+                },
+                ids.toArray());
+        return names;
+    }
+
+    // Used by the old admin page to look people up. The name is a bound parameter, with the LIKE wildcards escaped,
+    // so it matches literally.
     public List<Map<String, Object>> search(String name) {
-        return jdbc.queryForList("SELECT id, name, email, bio FROM speaker WHERE name ILIKE '%" + name + "%' ORDER BY name");
+        String pattern = "%" + name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        return jdbc.queryForList("SELECT id, name, email, bio FROM speaker WHERE name ILIKE ? ORDER BY name", pattern);
     }
 }

@@ -72,6 +72,33 @@ class SpeakersTest {
         assertTrue(found.body().contains("\"name\":\"Ada " + name + "\""), found.body());
     }
 
+    @Test
+    void searchTreatsQuotesAndWildcardsAsText() throws Exception {
+        String name = "O'Brien" + UUID.randomUUID().toString().substring(0, 8);
+        assertEquals(201, register(name, "obrien-" + UUID.randomUUID() + "@example.com").statusCode());
+
+        HttpResponse<String> found = send("GET", "/speakers/search?q=" + java.net.URLEncoder.encode(name, "UTF-8"));
+        assertEquals(200, found.statusCode());
+        assertTrue(found.body().contains(name), found.body());
+
+        HttpResponse<String> injected = send("GET", "/speakers/search?q="
+                + java.net.URLEncoder.encode("x' OR '1'='1", "UTF-8"));
+        assertEquals("[]", injected.body());
+        assertEquals("[]", send("GET", "/speakers/search?q=%25%25%25").body());
+    }
+
+    @Test
+    void conflictKeepsBootsErrorBody() throws Exception {
+        String email = "dup-" + UUID.randomUUID() + "@example.com";
+        assertEquals(201, register("Dup", email).statusCode());
+        HttpResponse<String> res = register("Dup", email);
+        assertEquals(409, res.statusCode());
+        assertTrue(res.body().contains("\"status\":409"), res.body());
+        assertTrue(res.body().contains("\"error\":\"Conflict\""), res.body());
+        assertTrue(res.body().contains("\"message\":\"email already registered\""), res.body());
+        assertTrue(res.body().contains("\"path\":\"/speakers\""), res.body());
+    }
+
     private HttpResponse<String> register(String name, String email) throws Exception {
         return http.send(request("POST", "/speakers", speaker(name, email)), HttpResponse.BodyHandlers.ofString());
     }

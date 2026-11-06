@@ -56,4 +56,6 @@ CREATE TABLE IF NOT EXISTS co_speaker (
     speaker_id INTEGER NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ux_co_speaker ON co_speaker (talk_id, speaker_id);
-CREATE INDEX IF NOT EXISTS ix_co_speaker_talk ON co_speaker (talk_id);
+
+-- 2026-11 ix_co_speaker_talk duplicated the leading talk_id column of ux_co_speaker
+DROP INDEX IF EXISTS ix_co_speaker_talk;

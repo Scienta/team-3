@@ -33,12 +33,13 @@ class UtilsTest {
         assertEquals("Workshop", Utils.capitalize("WORKSHOP"));
     }
 
-    // Averages are shown with one decimal, cut off (CFP-61)
+    // Averages are shown with one decimal, halves up (Ratings spec: 4.25 shows as 4.3)
     @Test
     void roundsRatingToOneDecimal() {
-        assertEquals(4.2, Utils.roundRating(4.25));
-        assertEquals(3.6, Utils.roundRating(3.6666));
+        assertEquals(4.3, Utils.roundRating(4.25));
+        assertEquals(3.7, Utils.roundRating(3.6666));
         assertEquals(4.5, Utils.roundRating(4.5));
+        assertEquals(4.3, Utils.roundRating(4.3));
     }
 
     @Disabled("flaky on Jenkins")

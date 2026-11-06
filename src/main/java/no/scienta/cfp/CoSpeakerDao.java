@@ -23,9 +23,14 @@ public class CoSpeakerDao {
         this.jdbc = jdbc;
     }
 
-    /** Takes a row lock on the talk and tells whether it exists. Call inside the add/remove transaction. */
-    public boolean lockTalk(long talkId) {
-        return !jdbc.queryForList("SELECT id FROM talk WHERE id = ? FOR UPDATE", talkId).isEmpty();
+    /**
+     * Takes a row lock on the talk and returns its main speaker's id, or null if there is no such talk. Call inside
+     * the add/remove transaction.
+     */
+    public Long lockTalk(long talkId) {
+        List<Long> speakerIds = jdbc.queryForList("SELECT speaker_id FROM talk WHERE id = ? FOR UPDATE", Long.class,
+                talkId);
+        return speakerIds.isEmpty() ? null : speakerIds.get(0);
     }
 
     /** The co-speakers of one talk, in the order added. */
@@ -47,17 +52,6 @@ public class CoSpeakerDao {
                 },
                 talkIds.toArray());
         return byTalk;
-    }
-
-    public int count(long talkId) {
-        Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM co_speaker WHERE talk_id = ?", Integer.class, talkId);
-        return n == null ? 0 : n;
-    }
-
-    public boolean exists(long talkId, long speakerId) {
-        Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM co_speaker WHERE talk_id = ? AND speaker_id = ?",
-                Integer.class, talkId, speakerId);
-        return n != null && n > 0;
     }
 
     /** Idempotent: a repeat add changes nothing (unique on talk_id, speaker_id). */
