@@ -1,0 +1,31 @@
+# Shows your service's container logs (Actions tab → logs → Run workflow), through
+# .github/fagdag/logs.sh and the read-only token in .fagdag/logs-token.
+# From a laptop or an agent, running .github/fagdag/logs.sh yourself is quicker.
+name: logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      tail:
+        description: Number of lines, the newest (max 5000)
+        default: "200"
+        required: true
+      since:
+        description: Only lines after this RFC 3339 time, e.g. 2026-11-06T13:00:00Z (default the last 24 hours)
+        default: ""
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  logs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Logs
+        env:
+          TAIL: ${{ inputs.tail }}
+          SINCE: ${{ inputs.since }}
+        run: .github/fagdag/logs.sh --tail "$TAIL" ${SINCE:+--since "$SINCE"}

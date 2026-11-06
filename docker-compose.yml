@@ -1,0 +1,10 @@
+# Postgres for running the app locally, matching the defaults in application.properties.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: cfp
+      POSTGRES_USER: cfp
+      POSTGRES_PASSWORD: cfp
+    ports:
+      - "5432:5432"
