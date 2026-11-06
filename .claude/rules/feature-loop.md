@@ -17,6 +17,10 @@ iteration does **one** feature. Loop again for the next. See `AGENTS.md` for the
   `workflow/allocate.sh claim <slug>` before branching, and `release`/`done` it when the iteration ends,
   so two people never build the same feature (step 1). That pushes only the `agent-allocations` ledger
   branch — never `main` — and is the one push the loop may make unasked.
+- **Keep `REVIEW.md` current — every iteration.** It's the running log judged at 17:00 (every heading
+  needs text to be eligible). Step 9b appends to it with `workflow/review-log.sh`, which commits only
+  `REVIEW.md` straight to `origin/main` from a private worktree. That docs-only push doesn't deploy
+  (`deploy.yml` ignores `**/*.md`) and is the **only** push to `main` the loop may make unasked.
 - **Never touch the hands-off list** (`AGENTS.md` → "Hands off"): `.fagdag/` committed files, the
   `SCW_*`/`TEAM_URL` secrets and variables, the deploy workflow's org config, anything outside this
   team's own service. Never print or commit `.fagdag/harness-token`.
@@ -182,6 +186,7 @@ Regression review: specs re-read [<done-slugs>]; interactions found [<none | …
   regression tests added [<none | names>]; all prior tests pass
 Branch: feature/<slug>  (not merged, not pushed)
 Allocation: claimed via agent-allocations ledger; released/done at iteration end
+REVIEW.md: claim-log row [+ harness-fault entry] appended via workflow/review-log.sh (<sha>)
 Files changed: <list>
 Open questions for the product owner: <none | …>
 
@@ -189,6 +194,29 @@ Status: on branch feature/<slug>, ready for a person to review, merge to main (w
 on the harness — agents can't merge, deploy or claim.
 Evidence: passing tests above + (once deployed) green harness checks for <slug>.
 ```
+
+### 9b. Log it in `REVIEW.md` — don't skip
+
+Append this iteration to the running log on `main` (from any branch; your working tree is untouched):
+
+```bash
+# claim log row (section 3): feature, claimed/skipped/ready-to-claim, tick, evidence held
+workflow/review-log.sh 3 "<slug> claim log" <<'EOF'
+| <slug> | ready to claim (person to confirm) | <tick> | <tests + hurl that are green, regression review> |
+EOF
+# a FAULTY check you fixed (section 4): what the harness sent, why our tests missed it, the fix commit
+workflow/review-log.sh 4 "<slug> harness fault" <<'EOF'
+- **<feature>/<check>, ticks <a>–<b>:** <request> failed because <cause>. Fixed in `<sha>`.
+  **Why we missed it:** <gap in our tests/review>.
+EOF
+```
+
+- Always write the section 3 row (also for a skip or back-off, with the reason). Write section 4 whenever
+  the iteration fixed a FAULTY check. Add to section 2 or 5 when the iteration introduced a new review
+  gate or a reusable artifact.
+- When a **person** claims on the harness, they (or the agent they ask) update that row's status to
+  `claimed` with the tick — agents never write `claimed` on their own.
+- If `review-log.sh` exits non-zero, say so in the report; don't silently drop the entry.
 
 ### 10. Next iteration
 
