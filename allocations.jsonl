@@ -7,3 +7,4 @@
 {"ts": "2026-11-06T13:51:29Z", "task": "programme-export", "member": "ro@scienta.no", "host": "Runar-xps15", "status": "done"}
 {"ts": "2026-11-06T13:59:34Z", "task": "scheduling", "member": "me@gmail", "host": "krabzbox", "status": "done"}
 {"ts": "2026-11-06T14:05:53Z", "task": "scheduling", "member": "ro@scienta.no", "host": "Runar-xps15", "status": "claimed"}
+{"ts": "2026-11-06T14:07:57Z", "task": "scheduling", "member": "ro@scienta.no", "host": "Runar-xps15", "status": "released"}
