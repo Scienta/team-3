@@ -167,7 +167,7 @@ class SchedulingTest {
         put("R1", "S1", a);
         assertEquals(204, del("R1", "S1").statusCode());
         assertEquals(404, get("R1", "S1").statusCode());
-        assertEquals(204, del("R1", "S1").statusCode());             // already empty
+        assertEquals(404, del("R1", "S1").statusCode());             // already empty: nothing to take out (harness check-1)
     }
 
     // R7: concurrent placements that would break the speaker rule can't both win
