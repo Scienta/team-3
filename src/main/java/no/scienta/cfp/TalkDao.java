@@ -25,8 +25,10 @@ public class TalkDao {
         t.status = rs.getString("status");
         t.speakerId = rs.getLong("speaker_id");
         long millis = rs.getLong("submitted_at");
-        t.submittedAt = new Date(millis);
-        t.submittedOn = Utils.toSqlDate(millis);
+        if (!rs.wasNull()) {                  // legacy/imported rows may have none: null, not 1970-01-01
+            t.submittedAt = new Date(millis);
+            t.submittedOn = Utils.toSqlDate(millis);
+        }
         return t;
     };
 
@@ -53,12 +55,13 @@ public class TalkDao {
     }
 
     /**
-     * Takes a row lock on the talk and returns its current status, or null if there is no such talk.
-     * Call inside the decide/withdraw transaction so two committee members can't both act on one state.
+     * Takes a row lock on the talk for the rest of the transaction and returns it, or null if there is no such talk.
+     * The one way to lock a talk (decide, withdraw, co-speakers, workshop registration): callers get every column
+     * they need from this read, so they don't re-query the row while holding the lock.
      */
-    public String lockStatus(long id) {
-        List<String> s = jdbc.queryForList("SELECT status FROM talk WHERE id = ? FOR UPDATE", String.class, id);
-        return s.isEmpty() ? null : s.get(0);
+    public TalkDto lockForUpdate(long id) {
+        List<TalkDto> list = jdbc.query("SELECT " + COLUMNS + " FROM talk WHERE id = ? FOR UPDATE", mapper, id);
+        return list.isEmpty() ? null : list.get(0);
     }
 
     public void updateStatus(long id, String status) {

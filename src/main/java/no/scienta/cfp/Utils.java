@@ -6,6 +6,7 @@ import java.text.DateFormatSymbols;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 
@@ -68,6 +69,9 @@ public class Utils {
      * "4. nov. 2026" for the committee spreadsheet.
      */
     public static String norwegianDate(Date d) {
+        if (d == null) {                          // a legacy talk without submitted_at
+            return "";
+        }
         // Explicit pattern and month names: newer Java (CLDR) writes "mars", "juni", "juli" instead of the
         // "mar.", "jun.", "jul." the spreadsheet has always had.
         DateFormatSymbols symbols = DateFormatSymbols.getInstance(new Locale("nb", "NO"));
@@ -78,14 +82,15 @@ public class Utils {
     }
 
     /**
-     * Makes a value safe for the semicolon CSV export.
+     * A field for the semicolon CSV export (/admin/talks.csv), RFC 4180 style with ';' as the separator: quoted only
+     * when it holds a ';', a quote or a line break, with quotes doubled. Nothing is changed or dropped.
      */
     public static String csv(String s) {
         if (s == null) {
             return "";
         }
-        if (s.contains(";") || s.contains("\"")) {
-            return "\"" + s.replace("\"", "'") + "\"";
+        if (s.indexOf(';') >= 0 || s.indexOf('"') >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0) {
+            return '"' + s.replace("\"", "\"\"") + '"';
         }
         return s;
     }
@@ -108,6 +113,21 @@ public class Utils {
             }
         }
         return true;
+    }
+
+    /**
+     * The /admin/stats average: the exact mean of the per-talk averages, one decimal, halves up; null if none. Summed
+     * as BigDecimal, because a double sum can land just under a half (1.01 + 2.09 = 3.0999.. -> 1.5, not 1.6).
+     */
+    public static Double meanRounded(List<Double> averages) {
+        if (averages.isEmpty()) {
+            return null;
+        }
+        BigDecimal sum = BigDecimal.ZERO;
+        for (Double a : averages) {
+            sum = sum.add(BigDecimal.valueOf(a));
+        }
+        return sum.divide(BigDecimal.valueOf(averages.size()), 1, RoundingMode.HALF_UP).doubleValue();
     }
 
     /**

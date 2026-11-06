@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository;
 
 /**
  * Workshop registrations, kept in the order they came in (the serial id). A row lock on the workshop's talk (see
- * {@link #lockTalk}) guards the 20-seat limit against a rush of concurrent registrations, since advisory locks aren't
+ * {@link TalkDao#lockForUpdate}) guards the 20-seat limit against a rush of concurrent registrations, since advisory locks aren't
  * guaranteed on this database; the unique index on (workshop_id, lower(email)) backs up the one-per-email rule.
  */
 @Repository
@@ -31,16 +31,6 @@ public class RegistrationDao {
 
     public RegistrationDao(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
-    }
-
-    /**
-     * Takes a row lock on the talk and returns its {format, status}, or null if there is no such talk. Call inside
-     * the registration transaction.
-     */
-    public Map<String, Object> lockTalk(long talkId) {
-        List<Map<String, Object>> rows = jdbc.queryForList("SELECT format, status FROM talk WHERE id = ? FOR UPDATE",
-                talkId);
-        return rows.isEmpty() ? null : rows.get(0);
     }
 
     public int count(long workshopId) {

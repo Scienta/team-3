@@ -1,7 +1,6 @@
 package no.scienta.cfp;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,12 +55,10 @@ public class SpeakerDao {
         if (ids.isEmpty()) {
             return names;
         }
-        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
-        jdbc.query("SELECT id, name FROM speaker WHERE id IN (" + placeholders + ")",
+        jdbc.query("SELECT id, name FROM speaker WHERE id = ANY(?)", SqlArrays.bigints(ids),
                 rs -> {
                     names.put(rs.getLong("id"), rs.getString("name"));
-                },
-                ids.toArray());
+                });
         return names;
     }
 

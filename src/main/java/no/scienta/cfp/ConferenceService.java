@@ -263,10 +263,11 @@ public class ConferenceService {
 
     @Transactional
     public TalkDto addCoSpeaker(long talkId, long speakerId) {
-        Long mainSpeakerId = coSpeakerDao.lockTalk(talkId);
-        if (mainSpeakerId == null) {
+        TalkDto talk = talkDao.lockForUpdate(talkId);         // row lock; the talk as it is under the lock
+        if (talk == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
         }
+        long mainSpeakerId = talk.speakerId;
         List<Long> current = coSpeakerDao.findByTalk(talkId);
         if (!current.contains(speakerId)) {                   // repeat add changes nothing
             if (!speakerDao.exists(speakerId)) {
@@ -280,8 +281,7 @@ public class ConferenceService {
             }
             // Co-speaking on a talk still in the running counts towards the speaker's cap; on a rejected or withdrawn
             // talk it doesn't. Lock order is talk, then speaker; submissions lock only the speaker, so no deadlock.
-            String status = talkDao.findById(talkId).status;
-            if (!"REJECTED".equals(status) && !"WITHDRAWN".equals(status)) {
+            if (!"REJECTED".equals(talk.status) && !"WITHDRAWN".equals(talk.status)) {
                 talkDao.lockSpeaker(speakerId);
                 if (talkDao.activeTalks(speakerId) >= Utils.MAX_TALKS) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -295,7 +295,7 @@ public class ConferenceService {
 
     @Transactional
     public TalkDto removeCoSpeaker(long talkId, long speakerId) {
-        if (coSpeakerDao.lockTalk(talkId) == null) {
+        if (talkDao.lockForUpdate(talkId) == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
         }
         if (!speakerDao.exists(speakerId)) {                 // same as adding: an unknown speaker is a 404
@@ -329,10 +329,11 @@ public class ConferenceService {
 
     @Transactional
     public TalkDto decide(long talkId, Map<String, Object> body) {
-        String current = talkDao.lockStatus(talkId);        // row lock: concurrent deciders are serialised
-        if (current == null) {                               // an unknown talk is a 404 whatever the body says
+        TalkDto talk = talkDao.lockForUpdate(talkId);        // row lock: concurrent deciders are serialised
+        if (talk == null) {                                  // an unknown talk is a 404 whatever the body says
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
         }
+        String current = talk.status;
         Object status = body == null ? null : body.get("status");
         if (!(status instanceof String) || !DECISIONS.contains(status)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "status must be one of " + DECISIONS);
@@ -350,16 +351,16 @@ public class ConferenceService {
 
     @Transactional
     public TalkDto withdraw(long talkId, Map<String, Object> body) {
-        String current = talkDao.lockStatus(talkId);        // row lock: serialise against concurrent decisions
-        if (current == null) {                               // an unknown talk is a 404 whatever the body says
+        TalkDto talk = talkDao.lockForUpdate(talkId);        // row lock: serialise against concurrent decisions
+        if (talk == null) {                                  // an unknown talk is a 404 whatever the body says
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
         }
+        String current = talk.status;
         Object sid = body == null ? null : body.get("speakerId");
         if (!(sid instanceof Integer || sid instanceof Long)) {   // 1.5, "7" or true is not a speaker id
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "speakerId must be a whole number");
         }
         long speakerId = ((Number) sid).longValue();
-        TalkDto talk = talkDao.findById(talkId);
         if (talk.speakerId != speakerId) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "only the speaker can withdraw their own talk");
         }
@@ -375,7 +376,7 @@ public class ConferenceService {
     // Checks run 404 (no such talk), then 400 (bad body), then 409 (the rules), like the acceptance endpoints.
     @Transactional
     public Map<String, Object> registerForWorkshop(long talkId, Map<String, Object> body) {
-        Map<String, Object> talk = registrationDao.lockTalk(talkId);   // row lock: a rush is serialised per workshop
+        TalkDto talk = talkDao.lockForUpdate(talkId);                  // row lock: a rush is serialised per workshop
         if (talk == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
         }
@@ -388,7 +389,7 @@ public class ConferenceService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "a valid email is required");
         }
         // one rule in the spec: only a workshop the committee accepted takes registrations
-        if (!"WORKSHOP".equals(talk.get("format")) || !"ACCEPTED".equals(talk.get("status"))) {
+        if (!"WORKSHOP".equals(talk.format) || !"ACCEPTED".equals(talk.status)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "only an accepted workshop takes registrations");
         }
         if (registrationDao.registered(talkId, (String) email)) {
@@ -421,16 +422,14 @@ public class ConferenceService {
         Map<String, Integer> byLevel = new LinkedHashMap<>();
         Map<String, Integer> byStatus = new LinkedHashMap<>();
         int minutes = 0;
-        double ratingSum = 0;
-        int rated = 0;
+        List<Double> averages = new ArrayList<>();
         for (TalkDto t : talks) {
             byFormat.put(t.format, byFormat.getOrDefault(t.format, 0) + 1);
             byLevel.put(t.level, byLevel.getOrDefault(t.level, 0) + 1);
             byStatus.put(t.status, byStatus.getOrDefault(t.status, 0) + 1);
             minutes += t.durationMinutes;
             if (t.averageRating != null) {
-                ratingSum += t.averageRating;
-                rated++;
+                averages.add(t.averageRating);
             }
         }
         Map<String, Object> stats = new LinkedHashMap<>();
@@ -441,7 +440,7 @@ public class ConferenceService {
         stats.put("byLevel", byLevel);
         stats.put("byStatus", byStatus);
         stats.put("totalHours", minutes / 60.0);
-        stats.put("averageRating", rated == 0 ? null : Utils.roundRating(ratingSum / rated));
+        stats.put("averageRating", Utils.meanRounded(averages));
         stats.put("generated", Utils.now());
         return stats;
     }
@@ -450,8 +449,9 @@ public class ConferenceService {
 
     @Transactional
     public Map<String, Object> rate(long talkId, long reviewerId, Map<String, Object> body) {
-        if (reviewerId < 1) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "reviewerId must be positive");
+        if (reviewerId < 1 || reviewerId > Integer.MAX_VALUE) {   // rating.reviewer_id is an INTEGER: never a 500
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "reviewerId must be a positive whole number up to " + Integer.MAX_VALUE);
         }
         Object score = body.get("score");
         if (!(score instanceof Integer)) {
