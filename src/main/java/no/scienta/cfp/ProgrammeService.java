@@ -95,7 +95,9 @@ public class ProgrammeService {
     public void remove(String room, String slot) {
         requireRoomAndSlot(room, slot);
         programmeDao.lockSlot(slot);
-        programmeDao.remove(room, slot);                   // idempotent: no-op if already empty
+        if (programmeDao.remove(room, slot) == 0) {        // nothing to take out: 404, as GET on an empty cell (check-1)
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "nothing scheduled in " + room + "/" + slot);
+        }
     }
 
     /**
