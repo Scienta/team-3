@@ -14,7 +14,7 @@ iteration does **one** feature. Loop again for the next. See `AGENTS.md` for the
   or otherwise deploy without being asked — pushing to `main` deploys. Leave the branch for a person to
   review and merge.
 - **Claim before building.** Teammates run this loop on their own machines too. Grab a task with
-  `workflow/allocate.sh claim <slug>` before branching, and `release`/`done` it when the iteration ends,
+  `workflow/allocate.sh grab <slug>` before branching, and `release`/`done` it when the iteration ends,
   so two people never build the same feature (step 1). That pushes only the `agent-allocations` ledger
   branch — never `main` — and is the one push the loop may make unasked.
 - **Keep `REVIEW.md` current — every iteration.** It's the running log judged at 17:00 (every heading
@@ -63,10 +63,10 @@ For a FAULTY check, pull the failing request and transcript:
 curl -fsS -H "Authorization: Bearer $TOKEN" "$H/api/teams/$TEAM/feedback/timeline?check=<feature>/<check>"
 ```
 
-Then **claim the first candidate you can**, so teammates running this loop don't build the same thing.
-Walk the list in priority order and try to grab each:
+Then **grab the first candidate you can**, so teammates running this loop don't build the same thing.
+Walk the list in priority order and try to grab each (this is the ledger lock, *not* the harness claim):
 ```bash
-workflow/allocate.sh claim <slug>    # exit 0 = it's yours; 10 = a teammate has it; 11 = contention, retry later
+workflow/allocate.sh grab <slug>    # exit 0 = it's yours; 10 = a teammate has it; 11 = contention, retry later
 ```
 Take the first candidate that exits `0` as this iteration's target. On exit `10`, move to the next
 candidate. If nothing is actionable (all released specs done, no faults) **or** every candidate is
