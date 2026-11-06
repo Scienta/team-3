@@ -59,3 +59,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_co_speaker ON co_speaker (talk_id, speaker_
 
 -- 2026-11 ix_co_speaker_talk duplicated the leading talk_id column of ux_co_speaker
 DROP INDEX IF EXISTS ix_co_speaker_talk;
+
+-- 2026-11 workshop registration: attendees of an accepted workshop, at most 20, one per email (any case),
+-- in the order they registered (serial id). The email is kept as the attendee typed it.
+CREATE TABLE IF NOT EXISTS registration (
+    id          SERIAL PRIMARY KEY,
+    workshop_id INTEGER NOT NULL,
+    name        TEXT NOT NULL,
+    email       TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_registration_email ON registration (workshop_id, lower(email));

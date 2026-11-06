@@ -45,14 +45,17 @@ public class ConferenceService {
     private final TalkDao talkDao;
     private final RatingDao ratingDao;
     private final CoSpeakerDao coSpeakerDao;
+    private final RegistrationDao registrationDao;
     private final NotificationService notifications;
 
     public ConferenceService(SpeakerDao speakerDao, TalkDao talkDao, RatingDao ratingDao,
-                             CoSpeakerDao coSpeakerDao, NotificationService notifications) {
+                             CoSpeakerDao coSpeakerDao, RegistrationDao registrationDao,
+                             NotificationService notifications) {
         this.speakerDao = speakerDao;
         this.talkDao = talkDao;
         this.ratingDao = ratingDao;
         this.coSpeakerDao = coSpeakerDao;
+        this.registrationDao = registrationDao;
         this.notifications = notifications;
     }
 
@@ -345,6 +348,49 @@ public class ConferenceService {
         }
         talkDao.updateStatus(talkId, "WITHDRAWN");
         return getTalk(talkId);
+    }
+
+    // ---------------------------------------------------------------- workshop registration
+
+    // Checks run 404 (no such workshop), then 400 (bad body), then 409 (the rules), like the acceptance endpoints.
+    @Transactional
+    public Map<String, Object> registerForWorkshop(long talkId, Map<String, Object> body) {
+        Map<String, Object> talk = registrationDao.lockTalk(talkId);   // row lock: a rush is serialised per workshop
+        if (talk == null || !"WORKSHOP".equals(talk.get("format"))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "workshop not found");
+        }
+        Object name = body == null ? null : body.get("name");
+        Object email = body == null ? null : body.get("email");
+        if (!(name instanceof String) || Utils.isEmpty((String) name)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "name is required");
+        }
+        if (!(email instanceof String) || !Utils.isValidEmail((String) email)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "a valid email is required");
+        }
+        if (!"ACCEPTED".equals(talk.get("status"))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "only an accepted workshop takes registrations");
+        }
+        if (registrationDao.registered(talkId, (String) email)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "this email is already registered");
+        }
+        if (registrationDao.count(talkId) >= RegistrationDao.CAPACITY) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "the workshop is full (" + RegistrationDao.CAPACITY + " attendees)");
+        }
+        try {
+            return registrationDao.insert(talkId, (String) name, (String) email);
+        } catch (DuplicateKeyException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "this email is already registered");
+        }
+    }
+
+    // Registrations stay listed after the workshop is withdrawn; a talk that isn't a workshop has none to show.
+    public List<Map<String, Object>> workshopRegistrations(long talkId) {
+        TalkDto talk = talkDao.findById(talkId);
+        if (talk == null || !"WORKSHOP".equals(talk.format)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "workshop not found");
+        }
+        return registrationDao.findByWorkshop(talkId);
     }
 
     // ---------------------------------------------------------------- statistics
