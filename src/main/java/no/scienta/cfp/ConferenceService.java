@@ -352,12 +352,12 @@ public class ConferenceService {
 
     // ---------------------------------------------------------------- workshop registration
 
-    // Checks run 404 (no such workshop), then 400 (bad body), then 409 (the rules), like the acceptance endpoints.
+    // Checks run 404 (no such talk), then 400 (bad body), then 409 (the rules), like the acceptance endpoints.
     @Transactional
     public Map<String, Object> registerForWorkshop(long talkId, Map<String, Object> body) {
         Map<String, Object> talk = registrationDao.lockTalk(talkId);   // row lock: a rush is serialised per workshop
-        if (talk == null || !"WORKSHOP".equals(talk.get("format"))) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "workshop not found");
+        if (talk == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
         }
         Object name = body == null ? null : body.get("name");
         Object email = body == null ? null : body.get("email");
@@ -367,7 +367,8 @@ public class ConferenceService {
         if (!(email instanceof String) || !Utils.isValidEmail((String) email)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "a valid email is required");
         }
-        if (!"ACCEPTED".equals(talk.get("status"))) {
+        // one rule in the spec: only a workshop the committee accepted takes registrations
+        if (!"WORKSHOP".equals(talk.get("format")) || !"ACCEPTED".equals(talk.get("status"))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "only an accepted workshop takes registrations");
         }
         if (registrationDao.registered(talkId, (String) email)) {
@@ -384,11 +385,10 @@ public class ConferenceService {
         }
     }
 
-    // Registrations stay listed after the workshop is withdrawn; a talk that isn't a workshop has none to show.
+    // Registrations stay listed after the workshop is withdrawn; a talk that isn't a workshop just has none.
     public List<Map<String, Object>> workshopRegistrations(long talkId) {
-        TalkDto talk = talkDao.findById(talkId);
-        if (talk == null || !"WORKSHOP".equals(talk.format)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "workshop not found");
+        if (!talkDao.exists(talkId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
         }
         return registrationDao.findByWorkshop(talkId);
     }

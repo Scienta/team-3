@@ -87,7 +87,7 @@ HTTP 200
 [Asserts]
 jsonpath "$" count == 2
 
-# A talk that isn't a workshop, or doesn't exist: not found
+# A talk that isn't a workshop takes no registrations (409, nobody listed); a talk that doesn't exist: not found
 POST {{base_url}}/talks
 {
   "title": "Just a talk",
@@ -101,7 +101,12 @@ talk_id: jsonpath "$.id"
 
 POST {{base_url}}/workshops/{{talk_id}}/registrations
 { "name": "Ada", "email": "ada@example.com" }
-HTTP 404
+HTTP 409
+
+GET {{base_url}}/workshops/{{talk_id}}/registrations
+HTTP 200
+[Asserts]
+jsonpath "$" count == 0
 
 GET {{base_url}}/workshops/99999999/registrations
 HTTP 404

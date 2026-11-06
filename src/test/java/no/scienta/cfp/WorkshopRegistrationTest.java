@@ -99,13 +99,15 @@ class WorkshopRegistrationTest {
     }
 
     @Test
-    void aTalkThatIsNotAWorkshopIsNotFound() throws Exception {
+    void anAcceptedTalkThatIsNotAWorkshopTakesNoRegistrations() throws Exception {
         long talk = newTalk(newSpeaker(), "PRESENTATION");
         rate(talk, 1, 4);
         rate(talk, 2, 4);
         assertEquals(200, status(talk, "ACCEPTED").statusCode());
-        assertEquals(404, register(talk, "Ada", "ada@example.com").statusCode());
-        assertEquals(404, get("/workshops/" + talk + "/registrations").statusCode());
+        assertEquals(409, register(talk, "Ada", "ada@example.com").statusCode());
+        HttpResponse<String> list = get("/workshops/" + talk + "/registrations");
+        assertEquals(200, list.statusCode(), list.body());
+        assertEquals("[]", list.body());
     }
 
     @Test
