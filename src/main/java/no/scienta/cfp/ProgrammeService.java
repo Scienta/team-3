@@ -10,7 +10,6 @@ import java.util.Set;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -47,7 +46,8 @@ public class ProgrammeService {
 
         TalkDto talk = talkDao.findById(talkId);
         if (talk == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
+            // an unknown talk in the body is a bad request, as POST /talks treats an unknown speakerId
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "talk " + talkId + " does not exist");
         }
         if (!"ACCEPTED".equals(talk.status)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "only accepted talks go on the programme");
@@ -101,10 +101,10 @@ public class ProgrammeService {
     /**
      * The programme export: one row per scheduled talk, in programme order, with the talk and its speakers as
      * they are now. Speaker names are fetched in one batch (pool is capped at 5, no N+1). A single read-only
-     * REPEATABLE READ transaction makes the three queries see the same snapshot, so a row can't pair a talk
-     * with co-speakers from a later moment.
+     * transaction, REPEATABLE READ via {@link TransactionConfig} (never the isolation attribute: it leaks), makes
+     * the three queries see the same snapshot, so a row can't pair a talk with co-speakers from a later moment.
      */
-    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    @Transactional(readOnly = true)
     public List<ProgrammeRow> export() {
         List<ProgrammeRow> rows = programmeDao.findAll();
         List<Long> talkIds = new ArrayList<>();

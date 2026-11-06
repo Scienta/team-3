@@ -125,7 +125,7 @@ PUT {{base_url}}/programme/R1/S3
 HTTP 400
 PUT {{base_url}}/programme/R1/S3
 { "talkId": 99999999 }
-HTTP 404
+HTTP 400
 
 # Empty cell
 GET {{base_url}}/programme/R3/S5

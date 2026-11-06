@@ -152,7 +152,7 @@ class SchedulingTest {
         assertEquals(404, put("R0", "S2", 1L).statusCode());
         assertEquals(404, put("R2", "slot2", 1L).statusCode());
         assertEquals(400, put("R1", "S1", null).statusCode());       // missing talkId
-        assertEquals(404, put("R1", "S1", 99999999L).statusCode());  // unknown talk
+        assertEquals(400, put("R1", "S1", 99999999L).statusCode());  // unknown talk in the body
     }
 
     // DELETE is idempotent
