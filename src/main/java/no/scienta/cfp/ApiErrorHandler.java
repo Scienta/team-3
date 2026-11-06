@@ -2,12 +2,13 @@ package no.scienta.cfp;
 
 import java.util.Map;
 
-import javax.servlet.RequestDispatcher;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.boot.web.error.ErrorAttributeOptions;
-import org.springframework.boot.web.servlet.error.ErrorAttributes;
+import org.springframework.boot.webmvc.error.ErrorAttributes;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * Writes the client errors' JSON bodies inside the request, instead of leaving them to Spring Boot's error dispatch,
@@ -35,7 +37,7 @@ public class ApiErrorHandler {
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, Object>> statusException(ResponseStatusException e, HttpServletRequest request) {
-        return body(e.getStatus(), e.getReason(), e, request);
+        return body(e.getStatusCode(), e.getReason(), e, request);
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class,
@@ -45,7 +47,16 @@ public class ApiErrorHandler {
         return body(HttpStatus.BAD_REQUEST, "", e, request);
     }
 
-    private ResponseEntity<Map<String, Object>> body(HttpStatus status, String message, Exception e,
+    /**
+     * Unknown paths. Spring 6.1+ raises NoResourceFoundException, whose message ("No static resource nope.") Boot
+     * would put in the body; Boot 2.7 said "No message available", so keep that.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Map<String, Object>> notFound(NoResourceFoundException e, HttpServletRequest request) {
+        return body(HttpStatus.NOT_FOUND, "No message available", e, request);
+    }
+
+    private ResponseEntity<Map<String, Object>> body(HttpStatusCode status, String message, Exception e,
                                                      HttpServletRequest request) {
         // The attributes the servlet container sets for an error dispatch, which ErrorAttributes reads.
         request.setAttribute(RequestDispatcher.ERROR_STATUS_CODE, status.value());
@@ -53,7 +64,8 @@ public class ApiErrorHandler {
         request.setAttribute(RequestDispatcher.ERROR_MESSAGE, message == null ? "" : message);
         request.setAttribute(RequestDispatcher.ERROR_EXCEPTION, e);
         Map<String, Object> body = errorAttributes.getErrorAttributes(new ServletWebRequest(request),
-                ErrorAttributeOptions.of(ErrorAttributeOptions.Include.MESSAGE,
+                // defaults() is status, error and path (opt-in since Boot 3); plus message and errors as before
+                ErrorAttributeOptions.defaults().including(ErrorAttributeOptions.Include.MESSAGE,
                         ErrorAttributeOptions.Include.BINDING_ERRORS));
         return ResponseEntity.status(status).body(body);
     }
