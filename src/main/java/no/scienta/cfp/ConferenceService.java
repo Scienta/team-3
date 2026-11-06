@@ -275,6 +275,9 @@ public class ConferenceService {
         if (coSpeakerDao.lockTalk(talkId) == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
         }
+        if (!speakerDao.exists(speakerId)) {                 // same as adding: an unknown speaker is a 404
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "speaker not found");
+        }
         coSpeakerDao.delete(talkId, speakerId);              // idempotent: a no-op if not a co-speaker
         return getTalk(talkId);
     }
@@ -301,15 +304,15 @@ public class ConferenceService {
 
     @Transactional
     public TalkDto decide(long talkId, Map<String, Object> body) {
+        String current = talkDao.lockStatus(talkId);        // row lock: concurrent deciders are serialised
+        if (current == null) {                               // an unknown talk is a 404 whatever the body says
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
+        }
         Object status = body == null ? null : body.get("status");
         if (!(status instanceof String) || !DECISIONS.contains(status)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "status must be one of " + DECISIONS);
         }
         String target = (String) status;
-        String current = talkDao.lockStatus(talkId);        // row lock: concurrent deciders are serialised
-        if (current == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
-        }
         if (!DECISION_TARGETS.getOrDefault(current, Collections.emptySet()).contains(target)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "a " + current + " talk cannot become " + target);
         }
@@ -322,15 +325,15 @@ public class ConferenceService {
 
     @Transactional
     public TalkDto withdraw(long talkId, Map<String, Object> body) {
+        String current = talkDao.lockStatus(talkId);        // row lock: serialise against concurrent decisions
+        if (current == null) {                               // an unknown talk is a 404 whatever the body says
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
+        }
         Object sid = body == null ? null : body.get("speakerId");
         if (!(sid instanceof Number)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "speakerId is required");
         }
         long speakerId = ((Number) sid).longValue();
-        String current = talkDao.lockStatus(talkId);        // row lock: serialise against concurrent decisions
-        if (current == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
-        }
         TalkDto talk = talkDao.findById(talkId);
         if (talk.speakerId != speakerId) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "only the speaker can withdraw their own talk");

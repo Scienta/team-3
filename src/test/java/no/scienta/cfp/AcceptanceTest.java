@@ -224,6 +224,18 @@ class AcceptanceTest {
         assertEquals("WAITLISTED", currentStatus(talk));
     }
 
+    // the talk is looked up before the body is validated: an unknown talk is a 404 even with a bad body
+    @Test
+    void unknownTalkIsNotFoundEvenWithABadBody() throws Exception {
+        assertEquals(404, status(99999999L, "FOO").statusCode());
+        assertEquals(404, http.send(req("PUT", "/talks/99999999/status", null),
+                HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(404, http.send(req("POST", "/talks/99999999/withdraw", "{}"),
+                HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(404, http.send(req("POST", "/talks/99999999/withdraw", null),
+                HttpResponse.BodyHandlers.ofString()).statusCode());
+    }
+
     // R10: concurrent decisions on one talk never reach an illegal state; exactly one terminal decision wins
     @Test
     void concurrentDecisionsStayLegal() throws Exception {
