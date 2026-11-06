@@ -4,21 +4,24 @@
 #
 # Coordinates which teammate is building which feature, via an append-only JSON Lines ledger
 # (allocations.jsonl) on the orphan branch `agent-allocations`, which is NEVER merged to main (pushing
-# main deploys). Grabbing a task is an optimistic compare-and-swap: fetch -> check free -> append claim
-# -> push; git's atomic per-ref push rejects the loser of a race, who re-fetches and re-checks.
+# main deploys). "grab" is deliberately NOT called "claim": claiming a feature is the permanent,
+# person-only action on the harness; grabbing is just this team's build-coordination lock.
+#
+# Grabbing is an optimistic compare-and-swap: fetch -> check free -> append grab -> push; git's atomic
+# per-ref push rejects the loser of a race, who re-fetches and re-checks.
 #
 # Usage:
-#   workflow/allocate.sh claim   <task>   # exit 0 claimed, 10 already taken, 11 kept losing the race
+#   workflow/allocate.sh grab    <task>   # exit 0 grabbed, 10 already taken, 11 kept losing the race
 #   workflow/allocate.sh done    <task>   # release after finishing a feature
 #   workflow/allocate.sh release <task>   # release when giving up / iteration ended early
 #   workflow/allocate.sh status           # current owner of every task
-#   workflow/allocate.sh mine             # tasks currently claimed by me
+#   workflow/allocate.sh mine             # tasks currently grabbed by me
 #
 # Config (env, with defaults):
-#   MEMBER           identity for claims           (default: git config user.email)
+#   MEMBER           identity for grabs            (default: git config user.email)
 #   ALLOC_REMOTE     git remote                    (default: origin)
 #   ALLOC_BRANCH     ledger branch                 (default: agent-allocations)
-#   ALLOC_TTL_HOURS  a claim older than this is reclaimable as stale (default: 2)
+#   ALLOC_TTL_HOURS  a grab older than this is reclaimable as stale (default: 2)
 #   ALLOC_RETRIES    CAS push attempts             (default: 5)
 #   ALLOC_WORKTREE   where the ledger branch is checked out (default: <git-dir>/alloc-wt)
 #
@@ -45,12 +48,14 @@ HOST="$(hostname 2>/dev/null || echo unknown)"
 WT="${ALLOC_WORKTREE:-$(git rev-parse --git-dir)/alloc-wt}"
 
 # ---- ledger helpers (python3 does all JSON parsing/writing and the TTL check) ----
+# An "owned" event is status grabbed (or legacy claimed); released/done free the task.
 
 # Prints one of: FREE | MINE | "TAKEN <member>" | "STALE <member>" for $task, reading $WT/$FILE.
 owner_state() {
     python3 - "$WT/$FILE" "$1" "$MEMBER" "$TTL_HOURS" <<'PY'
 import sys, json, datetime
 path, task, me, ttl = sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4])
+OWNED = ("grabbed", "claimed")
 last = None
 try:
     with open(path) as f:
@@ -66,7 +71,7 @@ try:
                 last = e
 except FileNotFoundError:
     pass
-if last is None or last.get("status") != "claimed":
+if last is None or last.get("status") not in OWNED:
     print("FREE"); sys.exit()
 member = last.get("member", "")
 try:
@@ -132,7 +137,7 @@ sync_worktree() {
 
 # ---- commands ----
 
-cmd_claim() {
+cmd_grab() {
     local task="$1"
     ensure_worktree
     local attempt state verdict who
@@ -143,19 +148,19 @@ cmd_claim() {
         case "$verdict" in
             MINE)  echo "already yours: $task"; return 0 ;;
             TAKEN) echo "taken by $who"; return 10 ;;
-            STALE) append_event "$task" "released" ;;   # free the dead claim, then claim below
+            STALE) append_event "$task" "released" ;;   # free the dead grab, then grab below
             FREE)  : ;;
         esac
-        append_event "$task" "claimed"
+        append_event "$task" "grabbed"
         git -C "$WT" add "$FILE"
-        git -C "$WT" commit -q -m "claim $task by $MEMBER"
+        git -C "$WT" commit -q -m "grab $task by $MEMBER"
         if git -C "$WT" push -q "$REMOTE" "HEAD:$BRANCH" 2>/dev/null; then
-            echo "claimed $task"
+            echo "grabbed $task"
             return 0
         fi
         # push rejected: a teammate advanced the ref -> retry (re-fetch, re-check)
     done
-    echo "could not claim $task after $RETRIES attempts (contention)"
+    echo "could not grab $task after $RETRIES attempts (contention)"
     return 11
 }
 
@@ -187,6 +192,7 @@ cmd_report() { # cmd_report <all|mine>
     python3 - "$tmp" "$MEMBER" "$scope" "$TTL_HOURS" <<'PY'
 import sys, json, datetime
 path, me, scope, ttl = sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4])
+OWNED = ("grabbed", "claimed")
 last = {}
 with open(path) as fh:
     for line in fh:
@@ -205,18 +211,19 @@ rows = []
 for task in sorted(last):
     e = last[task]
     status, member, ts = e.get("status", ""), e.get("member", ""), e.get("ts", "")
+    owned = status in OWNED
     stale = ""
-    if status == "claimed":
+    if owned:
         try:
             age = (now - datetime.datetime.fromisoformat(str(ts).replace("Z", "+00:00"))).total_seconds()
             if age > ttl * 3600:
                 stale = " (stale)"
         except ValueError:
             stale = " (stale)"
-    if scope == "mine" and not (status == "claimed" and member == me):
+    if scope == "mine" and not (owned and member == me):
         continue
-    mark = " *" if (status == "claimed" and member == me) else ""
-    detail = (" " + ts + stale) if status == "claimed" else ""
+    mark = " *" if (owned and member == me) else ""
+    detail = (" " + ts + stale) if owned else ""
     rows.append(f"{task:20} {status:9} {member}{detail}{mark}")
 print("\n".join(rows) if rows else "(none)")
 PY
@@ -224,14 +231,14 @@ PY
 }
 
 usage() {
-    sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
 }
 
 main() {
     local cmd="${1:-}"
     case "$cmd" in
-        claim)   [ $# -eq 2 ] || usage; cmd_claim "$2" ;;
+        grab)    [ $# -eq 2 ] || usage; cmd_grab "$2" ;;
         done)    [ $# -eq 2 ] || usage; cmd_free "$2" "done" ;;
         release) [ $# -eq 2 ] || usage; cmd_free "$2" "released" ;;
         status)  cmd_report "all" ;;
