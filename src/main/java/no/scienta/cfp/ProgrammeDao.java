@@ -48,6 +48,26 @@ public class ProgrammeDao {
         return new HashSet<>(ids);
     }
 
+    /**
+     * Every scheduled talk with its current title, format and main speaker, in programme order: earliest slot
+     * first, then by room. Slot ids S1..S5 run in start-time order and room ids R1..R3 sort as named, so
+     * ordering by the ids is the day's order. The talk is read as it is now, whatever its status.
+     */
+    public List<ProgrammeRow> findAll() {
+        return jdbc.query("SELECT p.slot, p.room, t.id, t.title, t.format, t.speaker_id "
+                        + "FROM programme p JOIN talk t ON t.id = p.talk_id ORDER BY p.slot, p.room",
+                (rs, n) -> {
+                    ProgrammeRow row = new ProgrammeRow();
+                    row.slot = rs.getString("slot");
+                    row.room = rs.getString("room");
+                    row.talkId = rs.getLong("id");
+                    row.title = rs.getString("title");
+                    row.format = rs.getString("format");
+                    row.mainSpeakerId = rs.getLong("speaker_id");
+                    return row;
+                });
+    }
+
     public void place(String room, String slot, long talkId) {
         jdbc.update("INSERT INTO programme (room, slot, talk_id) VALUES (?, ?, ?)", room, slot, talkId);
     }
