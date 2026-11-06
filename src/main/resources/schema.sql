@@ -60,6 +60,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_co_speaker ON co_speaker (talk_id, speaker_
 -- 2026-11 ix_co_speaker_talk duplicated the leading talk_id column of ux_co_speaker
 DROP INDEX IF EXISTS ix_co_speaker_talk;
 
+-- 2026-11 programme scheduling: one accepted talk per room+slot, and each talk on the programme once
+CREATE TABLE IF NOT EXISTS programme (
+    room    TEXT NOT NULL,
+    slot    TEXT NOT NULL,
+    talk_id INTEGER NOT NULL,
+    PRIMARY KEY (room, slot)                 -- one talk per room+slot
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_programme_talk ON programme (talk_id);  -- a talk only once
+
+-- A lock row per slot. PUT/DELETE take SELECT ... FOR UPDATE on their slot's row, so the slot-wide
+-- checks (occupancy, and nobody speaking in two rooms at once) can't race across rooms. Advisory locks
+-- aren't guaranteed on this database, so we lock a real row.
+CREATE TABLE IF NOT EXISTS programme_slot (slot TEXT PRIMARY KEY);
+INSERT INTO programme_slot (slot) VALUES ('S1'), ('S2'), ('S3'), ('S4'), ('S5') ON CONFLICT DO NOTHING;
+
 -- 2026-11 workshop registration: attendees of an accepted workshop, at most 20, one per email (any case),
 -- in the order they registered (serial id). The email is kept as the attendee typed it.
 CREATE TABLE IF NOT EXISTS registration (
