@@ -332,8 +332,8 @@ public class ConferenceService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
         }
         Object sid = body == null ? null : body.get("speakerId");
-        if (!(sid instanceof Number)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "speakerId is required");
+        if (!(sid instanceof Integer || sid instanceof Long)) {   // 1.5, "7" or true is not a speaker id
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "speakerId must be a whole number");
         }
         long speakerId = ((Number) sid).longValue();
         TalkDto talk = talkDao.findById(talkId);

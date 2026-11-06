@@ -166,12 +166,18 @@ class AcceptanceTest {
         assertEquals("SUBMITTED", currentStatus(talk));
     }
 
-    // withdraw validation: missing speakerId is a 400
+    // withdraw validation: a missing or non-integer speakerId is a 400, and nothing changes
     @Test
     void withdrawWithoutSpeakerIdIsBadRequest() throws Exception {
-        long talk = newTalk(newSpeaker());
-        assertEquals(400, http.send(req("POST", "/talks/" + talk + "/withdraw", "{}"),
-                HttpResponse.BodyHandlers.ofString()).statusCode());
+        long speaker = newSpeaker();
+        long talk = newTalk(speaker);
+        for (String body : new String[]{"{}", "{\"speakerId\":1.5}", "{\"speakerId\":" + speaker + ".5}",
+                "{\"speakerId\":\"" + speaker + "\"}", "{\"speakerId\":true}", "{\"speakerId\":null}"}) {
+            assertEquals(400, http.send(req("POST", "/talks/" + talk + "/withdraw", body),
+                    HttpResponse.BodyHandlers.ofString()).statusCode(), body);
+        }
+        assertEquals("SUBMITTED", currentStatus(talk));
+        assertEquals(200, withdraw(talk, speaker).statusCode());
     }
 
     // unknown talk is a 404 on both endpoints
