@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -274,29 +275,46 @@ public class ConferenceService {
         if (coSpeakerDao.lockTalk(talkId) == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
         }
+        if (!speakerDao.exists(speakerId)) {                 // same as adding: an unknown speaker is a 404
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "speaker not found");
+        }
         coSpeakerDao.delete(talkId, speakerId);              // idempotent: a no-op if not a co-speaker
         return getTalk(talkId);
     }
 
     // ---------------------------------------------------------------- acceptance
 
-    // a talk can still be decided from these states; ACCEPTED/REJECTED are final and WITHDRAWN is out for good
-    private static final List<String> DECIDABLE = Arrays.asList("SUBMITTED", "WAITLISTED");
+    // The talk-status state machine, written out so every legal move is explicit and testable.
+    // DECISIONS: the values the committee's decision endpoint accepts at all (the Decision enum).
     private static final List<String> DECISIONS = Arrays.asList("ACCEPTED", "REJECTED", "WAITLISTED");
+    // DECISION_TARGETS: from a given status, which decisions the committee may make. ACCEPTED additionally
+    // needs two reviewers (checked in decide). ACCEPTED/REJECTED are final and WITHDRAWN is out for good,
+    // so from them no decision is legal -- in particular nothing ever moves a talk back to SUBMITTED.
+    private static final Map<String, Set<String>> DECISION_TARGETS = new HashMap<>();
+    // WITHDRAW_FROM: the statuses a speaker may withdraw from (anything but already REJECTED or WITHDRAWN).
+    private static final Set<String> WITHDRAW_FROM = new HashSet<>(Arrays.asList("SUBMITTED", "ACCEPTED", "WAITLISTED"));
+
+    static {
+        DECISION_TARGETS.put("SUBMITTED", new HashSet<>(DECISIONS));
+        DECISION_TARGETS.put("WAITLISTED", new HashSet<>(DECISIONS));
+        DECISION_TARGETS.put("ACCEPTED", Collections.emptySet());
+        DECISION_TARGETS.put("REJECTED", Collections.emptySet());
+        DECISION_TARGETS.put("WITHDRAWN", Collections.emptySet());
+    }
 
     @Transactional
     public TalkDto decide(long talkId, Map<String, Object> body) {
+        String current = talkDao.lockStatus(talkId);        // row lock: concurrent deciders are serialised
+        if (current == null) {                               // an unknown talk is a 404 whatever the body says
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
+        }
         Object status = body == null ? null : body.get("status");
         if (!(status instanceof String) || !DECISIONS.contains(status)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "status must be one of " + DECISIONS);
         }
         String target = (String) status;
-        String current = talkDao.lockStatus(talkId);        // row lock: concurrent deciders are serialised
-        if (current == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
-        }
-        if (!DECIDABLE.contains(current)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "a " + current + " talk cannot be decided again");
+        if (!DECISION_TARGETS.getOrDefault(current, Collections.emptySet()).contains(target)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "a " + current + " talk cannot become " + target);
         }
         if (target.equals("ACCEPTED") && ratingDao.distinctReviewers(talkId) < 2) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "a talk needs at least two reviewers to be accepted");
@@ -307,20 +325,20 @@ public class ConferenceService {
 
     @Transactional
     public TalkDto withdraw(long talkId, Map<String, Object> body) {
+        String current = talkDao.lockStatus(talkId);        // row lock: serialise against concurrent decisions
+        if (current == null) {                               // an unknown talk is a 404 whatever the body says
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
+        }
         Object sid = body == null ? null : body.get("speakerId");
         if (!(sid instanceof Number)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "speakerId is required");
         }
         long speakerId = ((Number) sid).longValue();
-        String current = talkDao.lockStatus(talkId);        // row lock: serialise against concurrent decisions
-        if (current == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
-        }
         TalkDto talk = talkDao.findById(talkId);
         if (talk.speakerId != speakerId) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "only the speaker can withdraw their own talk");
         }
-        if (current.equals("REJECTED") || current.equals("WITHDRAWN")) {
+        if (!WITHDRAW_FROM.contains(current)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "a " + current + " talk cannot be withdrawn");
         }
         talkDao.updateStatus(talkId, "WITHDRAWN");

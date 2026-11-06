@@ -18,7 +18,7 @@ iteration does **one** feature. Loop again for the next. See `AGENTS.md` for the
   team's own service. Never print or commit `.fagdag/harness-token`.
 - **Don't break the deploy contract.** Port 8080, `GET /health` semantics, `PG*` env, ephemeral disk.
 - **A feature request is not a full spec.** It gives business rules and the API surface, not status
-  codes, edge cases or error handling. The team decides those and **writes them down** (step 2). A
+  codes, edge cases or error handling. The team decides those and **writes them down** (step 3). A
   person can ask the organisers' product owner about business rules; surface open questions, don't guess.
 - **Stop and ask** when a business rule is genuinely ambiguous, when a change would touch a base
   feature's behaviour, or when the only way forward is to guess at a rule that affects scoring.
@@ -122,7 +122,31 @@ Build must be green and **no base feature may regress** (all pre-existing tests 
 fields are additive). If Hurl is installed, also run `examples/run.sh` against a local instance
 (`docker compose up -d` then `java -jar target/cfp.jar`).
 
-### 8. Test report — the deliverable
+### 8. Regression review — don't break earlier specs
+
+A new feature must not violate any requirement of a feature that is already done. Running the old tests
+(step 7) is necessary but not sufficient — they only catch what they already assert. After the build is
+green, do an explicit read-through:
+
+- **Re-read every earlier implemented spec**, not just the one you touched — each released, done
+  feature's `spec.md`:
+  ```bash
+  H=$(cat .fagdag/harness-url) TOKEN=$(cat .fagdag/harness-token)
+  for f in <done-slugs>; do echo "== $f =="; curl -fsS -H "Authorization: Bearer $TOKEN" "$H/specs/$f/spec.md"; done
+  ```
+  Walk each spec's requirements against your change and name any interaction. Pay special attention to
+  **shared shapes and endpoints** the new feature also returns or mutates — e.g. the `Talk` shape and
+  `talk.status` are shared by `talks`, `co-speakers` and `acceptance`; a new field or status value must
+  still satisfy the talks spec's ordering, submission limit and existing fields.
+- **Evaluate the earlier regression tests.** Confirm the existing `*Test.java` still assert those
+  requirements and still pass, then judge whether the new feature creates an interaction they don't yet
+  cover (e.g. "how do co-speakers behave on a WITHDRAWN talk?", "does the new status leak into
+  `GET /talks/top` ordering?"). Where there's a gap, **add a regression test** for it in the relevant
+  test class and re-run `./mvnw package`.
+- If any earlier requirement can't be preserved, **stop and ask** — never ship a feature that bleeds an
+  earlier feature's points. Record the outcome in the report's **Regression review** section.
+
+### 9. Test report — the deliverable
 
 Emit a report in this shape:
 
@@ -139,7 +163,8 @@ Requirement coverage:
 | ...                                                                              |
 
 Build: ./mvnw package -> SUCCESS (N tests, 0 failures)   [or the failure output]
-Base features: no regressions (all prior tests pass)
+Regression review: specs re-read [<done-slugs>]; interactions found [<none | …>];
+  regression tests added [<none | names>]; all prior tests pass
 Branch: feature/<slug>  (not merged, not pushed)
 Files changed: <list>
 Open questions for the product owner: <none | …>
@@ -149,7 +174,7 @@ on the harness — agents can't merge, deploy or claim.
 Evidence: passing tests above + (once deployed) green harness checks for <slug>.
 ```
 
-### 9. Next iteration
+### 10. Next iteration
 
 Report, then stop that iteration, leaving the feature branch in place for a person to review and merge.
 The loop picks the next target on the following run — starting again from an up-to-date `main` (step 2),

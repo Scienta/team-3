@@ -181,6 +181,61 @@ class AcceptanceTest {
         assertEquals(404, withdraw(99999999L, 1).statusCode());
     }
 
+    // explicit guard: from the final/out states, no committee decision is legal and nothing changes
+    @Test
+    void everyIllegalDecisionIsRejectedAndChangesNothing() throws Exception {
+        for (String from : new String[]{"ACCEPTED", "REJECTED", "WITHDRAWN"}) {
+            for (String target : new String[]{"ACCEPTED", "REJECTED", "WAITLISTED"}) {
+                long talk = inState(from, newSpeaker());
+                assertEquals(409, status(talk, target).statusCode(), from + " -> " + target);
+                assertEquals(from, currentStatus(talk), from + " unchanged after " + target);
+            }
+        }
+    }
+
+    // explicit guard: a rejected or withdrawn talk cannot be withdrawn, and nothing changes
+    @Test
+    void illegalWithdrawalsAreRejectedAndChangeNothing() throws Exception {
+        for (String from : new String[]{"REJECTED", "WITHDRAWN"}) {
+            long speaker = newSpeaker();
+            long talk = inState(from, speaker);
+            assertEquals(409, withdraw(talk, speaker).statusCode(), from + " withdraw");
+            assertEquals(from, currentStatus(talk), from + " unchanged after withdraw");
+        }
+    }
+
+    // the question that prompted this: a withdrawn or rejected talk can never go back to SUBMITTED
+    @Test
+    void withdrawnOrRejectedCannotReturnToSubmitted() throws Exception {
+        long rejected = inState("REJECTED", newSpeaker());
+        assertEquals(400, status(rejected, "SUBMITTED").statusCode());   // SUBMITTED is not a committee decision
+        assertEquals("REJECTED", currentStatus(rejected));
+
+        long withdrawn = inState("WITHDRAWN", newSpeaker());
+        assertEquals(400, status(withdrawn, "SUBMITTED").statusCode());
+        assertEquals("WITHDRAWN", currentStatus(withdrawn));
+    }
+
+    // a waitlisted talk may be waitlisted again: a legal no-op that stays WAITLISTED
+    @Test
+    void waitlistingAWaitlistedTalkIsAllowed() throws Exception {
+        long talk = inState("WAITLISTED", newSpeaker());
+        assertEquals(200, status(talk, "WAITLISTED").statusCode());
+        assertEquals("WAITLISTED", currentStatus(talk));
+    }
+
+    // the talk is looked up before the body is validated: an unknown talk is a 404 even with a bad body
+    @Test
+    void unknownTalkIsNotFoundEvenWithABadBody() throws Exception {
+        assertEquals(404, status(99999999L, "FOO").statusCode());
+        assertEquals(404, http.send(req("PUT", "/talks/99999999/status", null),
+                HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(404, http.send(req("POST", "/talks/99999999/withdraw", "{}"),
+                HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(404, http.send(req("POST", "/talks/99999999/withdraw", null),
+                HttpResponse.BodyHandlers.ofString()).statusCode());
+    }
+
     // R10: concurrent decisions on one talk never reach an illegal state; exactly one terminal decision wins
     @Test
     void concurrentDecisionsStayLegal() throws Exception {
@@ -219,6 +274,33 @@ class AcceptanceTest {
         assertEquals(201, res.statusCode(), res.body());
         assertEquals("SUBMITTED", status(res.body()));
         return firstId(res.body());
+    }
+
+    /** Creates a talk owned by {@code speakerId} and drives it into the given status by the legal path. */
+    private long inState(String state, long speakerId) throws Exception {
+        long talk = newTalk(speakerId);
+        switch (state) {
+            case "SUBMITTED":
+                break;
+            case "WAITLISTED":
+                assertEquals(200, status(talk, "WAITLISTED").statusCode());
+                break;
+            case "ACCEPTED":
+                rate(talk, 1, 4);
+                rate(talk, 2, 4);
+                assertEquals(200, status(talk, "ACCEPTED").statusCode());
+                break;
+            case "REJECTED":
+                assertEquals(200, status(talk, "REJECTED").statusCode());
+                break;
+            case "WITHDRAWN":
+                assertEquals(200, withdraw(talk, speakerId).statusCode());
+                break;
+            default:
+                throw new IllegalArgumentException(state);
+        }
+        assertEquals(state, currentStatus(talk));
+        return talk;
     }
 
     private void rate(long talkId, long reviewerId, int score) throws Exception {

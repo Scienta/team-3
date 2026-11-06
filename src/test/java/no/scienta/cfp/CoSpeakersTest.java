@@ -118,6 +118,8 @@ class CoSpeakersTest {
 
         HttpResponse<String> res = put("/talks/" + talk + "/co-speakers/99999999");
         assertEquals(404, res.statusCode(), res.body());
+        HttpResponse<String> del = delete("/talks/" + talk + "/co-speakers/99999999");
+        assertEquals(404, del.statusCode(), del.body());
     }
 
     @Test
