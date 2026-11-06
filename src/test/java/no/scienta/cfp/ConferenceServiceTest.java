@@ -16,6 +16,7 @@ class ConferenceServiceTest {
     private SpeakerDao speakerDao;
     private TalkDao talkDao;
     private RatingDao ratingDao;
+    private CoSpeakerDao coSpeakerDao;
     private ConferenceService service;
 
     @BeforeEach
@@ -23,7 +24,8 @@ class ConferenceServiceTest {
         speakerDao = mock(SpeakerDao.class);
         talkDao = mock(TalkDao.class);
         ratingDao = mock(RatingDao.class);
-        service = new ConferenceService(speakerDao, talkDao, ratingDao, mock(NotificationService.class));
+        coSpeakerDao = mock(CoSpeakerDao.class);
+        service = new ConferenceService(speakerDao, talkDao, ratingDao, coSpeakerDao, mock(NotificationService.class));
     }
 
     @Test

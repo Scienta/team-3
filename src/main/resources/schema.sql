@@ -48,3 +48,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_speaker_email ON speaker (lower(email));
 
 -- 2022-01 GET /speakers/{id}/talks was slow
 CREATE INDEX IF NOT EXISTS ix_talk_speaker ON talk (speaker_id);
+
+-- 2026-11 co-speakers: up to two extra registered speakers per talk, in the order added (serial id)
+CREATE TABLE IF NOT EXISTS co_speaker (
+    id         SERIAL PRIMARY KEY,
+    talk_id    INTEGER NOT NULL,
+    speaker_id INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_co_speaker ON co_speaker (talk_id, speaker_id);
+CREATE INDEX IF NOT EXISTS ix_co_speaker_talk ON co_speaker (talk_id);

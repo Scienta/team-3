@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,5 +44,15 @@ public class TalkController {
     public Map<String, Object> rate(@PathVariable Long id, @PathVariable Long reviewerId,
                                     @RequestBody Map<String, Object> body) {
         return service.rate(id, reviewerId, body);
+    }
+
+    @PutMapping("/talks/{id}/co-speakers/{speakerId}")
+    public TalkDto addCoSpeaker(@PathVariable Long id, @PathVariable Long speakerId) {
+        return service.addCoSpeaker(id, speakerId);
+    }
+
+    @DeleteMapping("/talks/{id}/co-speakers/{speakerId}")
+    public TalkDto removeCoSpeaker(@PathVariable Long id, @PathVariable Long speakerId) {
+        return service.removeCoSpeaker(id, speakerId);
     }
 }
