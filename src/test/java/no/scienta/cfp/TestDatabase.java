@@ -7,7 +7,7 @@ import java.sql.Statement;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.springframework.test.context.DynamicPropertyRegistry;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
  * A throwaway Postgres database per test class. One container is started for the whole test run, and each call to
@@ -15,7 +15,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
  */
 final class TestDatabase {
 
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
+    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine");
     private static final AtomicInteger COUNTER = new AtomicInteger();
 
     private TestDatabase() {
@@ -29,7 +29,7 @@ final class TestDatabase {
     }
 
     /** Points the app at a database through the deploy contract's PG* variables, as on Scaleway. */
-    static void pointAt(DynamicPropertyRegistry registry, PostgreSQLContainer<?> postgres, String database) {
+    static void pointAt(DynamicPropertyRegistry registry, PostgreSQLContainer postgres, String database) {
         registry.add("PGHOST", postgres::getHost);
         registry.add("PGPORT", () -> postgres.getMappedPort(5432));
         registry.add("PGDATABASE", () -> database);

@@ -12,11 +12,10 @@
     <description>Call for papers backend</description>
 
     <properties>
-        <java.version>11</java.version>
-        <maven.compiler.release>11</maven.compiler.release>
+        <java.version>17</java.version>
+        <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring-boot.version>2.7.18</spring-boot.version>
-        <testcontainers.version>1.21.4</testcontainers.version>
+        <spring-boot.version>4.1.2</spring-boot.version>
     </properties>
 
     <!-- We can't use spring-boot-starter-parent because of the old company parent pom,
@@ -36,7 +35,7 @@
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -69,8 +68,7 @@
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>postgresql</artifactId>
-            <version>${testcontainers.version}</version>
+            <artifactId>testcontainers-postgresql</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -81,9 +79,12 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.10.1</version>
+                <version>3.14.1</version>
                 <configuration>
-                    <release>11</release>
+                    <release>${maven.compiler.release}</release>
+                    <!-- Spring 6.1+ reads @PathVariable/@RequestParam names from -parameters only
+                         (spring-boot-starter-parent sets this, but we can't use the parent) -->
+                    <parameters>true</parameters>
                 </configuration>
             </plugin>
             <plugin>

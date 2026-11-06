@@ -36,7 +36,7 @@ class ConferenceServiceTest {
         TalkForm form = form();
         form.title = " ";
         ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.submitTalk(form));
-        assertEquals(HttpStatus.BAD_REQUEST, e.getStatus());
+        assertEquals(HttpStatus.BAD_REQUEST, e.getStatusCode());
     }
 
     @Test
@@ -44,14 +44,14 @@ class ConferenceServiceTest {
         TalkForm form = form();
         form.format = "KEYNOTE";
         ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.submitTalk(form));
-        assertEquals(HttpStatus.BAD_REQUEST, e.getStatus());
+        assertEquals(HttpStatus.BAD_REQUEST, e.getStatusCode());
     }
 
     @Test
     void unknownSpeakerIsRejected() {
         when(speakerDao.exists(7L)).thenReturn(false);
         ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.submitTalk(form()));
-        assertEquals(HttpStatus.BAD_REQUEST, e.getStatus());
+        assertEquals(HttpStatus.BAD_REQUEST, e.getStatusCode());
     }
 
     @Test
@@ -63,7 +63,7 @@ class ConferenceServiceTest {
         when(speakerDao.insert("Ada", "ada@example.com", null))
                 .thenThrow(new DuplicateKeyException("FEIL: duplisert nøkkelverdi bryter unik-skranke"));
         ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.registerSpeaker(form));
-        assertEquals(HttpStatus.CONFLICT, e.getStatus());
+        assertEquals(HttpStatus.CONFLICT, e.getStatusCode());
     }
 
     @Test
@@ -73,7 +73,7 @@ class ConferenceServiceTest {
         form.setEmail("ada@example.com");
         when(speakerDao.emailTaken("ada@example.com")).thenReturn(true);
         ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.registerSpeaker(form));
-        assertEquals(HttpStatus.CONFLICT, e.getStatus());
+        assertEquals(HttpStatus.CONFLICT, e.getStatusCode());
     }
 
     @Test
@@ -82,7 +82,7 @@ class ConferenceServiceTest {
         form.setName("Ada");
         form.setEmail("not-an-email");
         ResponseStatusException e = assertThrows(ResponseStatusException.class, () -> service.registerSpeaker(form));
-        assertEquals(HttpStatus.BAD_REQUEST, e.getStatus());
+        assertEquals(HttpStatus.BAD_REQUEST, e.getStatusCode());
     }
 
     @Test
@@ -95,7 +95,7 @@ class ConferenceServiceTest {
                 .thenThrow(new DuplicateKeyException("duplicate key value violates unique constraint"));
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
                 () -> service.updateSpeaker(1L, "Ada", "grace@example.com", null));
-        assertEquals(HttpStatus.CONFLICT, e.getStatus());
+        assertEquals(HttpStatus.CONFLICT, e.getStatusCode());
     }
 
     @Test
@@ -106,7 +106,7 @@ class ConferenceServiceTest {
         String bio = new String(new char[Utils.MAX_BIO + 1]).replace('\0', 'x');
         ResponseStatusException e = assertThrows(ResponseStatusException.class,
                 () -> service.updateSpeaker(1L, "Ada", "ada@example.com", bio));
-        assertEquals(HttpStatus.BAD_REQUEST, e.getStatus());
+        assertEquals(HttpStatus.BAD_REQUEST, e.getStatusCode());
     }
 
     private TalkForm form() {

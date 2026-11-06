@@ -2,7 +2,7 @@ package no.scienta.cfp;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.text.DateFormat;
+import java.text.DateFormatSymbols;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -21,6 +21,9 @@ public class Utils {
     public static final int MAX_BIO = 500;
 
     private static final TimeZone UTC = TimeZone.getTimeZone("UTC");
+
+    private static final String[] NORWEGIAN_SHORT_MONTHS = {"jan.", "feb.", "mar.", "apr.", "mai", "jun.", "jul.",
+            "aug.", "sep.", "okt.", "nov.", "des.", ""};
 
     public static String today() {
         return new SimpleDateFormat("dd.MM.yyyy").format(new Date());
@@ -55,7 +58,8 @@ public class Utils {
      * "11/4/26, 1:05 PM", what the reviewer UI shows.
      */
     public static String usShort(Date d) {
-        DateFormat f = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, Locale.US);
+        // Explicit pattern: from Java 20 (CLDR 42) Locale.US SHORT puts a narrow no-break space before AM/PM.
+        SimpleDateFormat f = new SimpleDateFormat("M/d/yy, h:mm a", Locale.US);
         f.setTimeZone(UTC);
         return f.format(d);
     }
@@ -64,7 +68,11 @@ public class Utils {
      * "4. nov. 2026" for the committee spreadsheet.
      */
     public static String norwegianDate(Date d) {
-        DateFormat f = DateFormat.getDateInstance(DateFormat.MEDIUM, new Locale("nb", "NO"));
+        // Explicit pattern and month names: newer Java (CLDR) writes "mars", "juni", "juli" instead of the
+        // "mar.", "jun.", "jul." the spreadsheet has always had.
+        DateFormatSymbols symbols = DateFormatSymbols.getInstance(new Locale("nb", "NO"));
+        symbols.setShortMonths(NORWEGIAN_SHORT_MONTHS);
+        SimpleDateFormat f = new SimpleDateFormat("d. MMM y", symbols);
         f.setTimeZone(TimeZone.getTimeZone("Europe/Oslo"));
         return f.format(d);
     }
