@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * Writes the client errors' JSON bodies inside the request, instead of leaving them to Spring Boot's error dispatch,
@@ -44,6 +45,15 @@ public class ApiErrorHandler {
     public ResponseEntity<Map<String, Object>> badRequest(Exception e, HttpServletRequest request) {
         // Boot sends these without a message; the validation details go in "errors".
         return body(HttpStatus.BAD_REQUEST, "", e, request);
+    }
+
+    /**
+     * Unknown paths. Spring 6.1+ raises NoResourceFoundException, whose message ("No static resource nope.") Boot
+     * would put in the body; Boot 2.7 said "No message available", so keep that.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Map<String, Object>> notFound(NoResourceFoundException e, HttpServletRequest request) {
+        return body(HttpStatus.NOT_FOUND, "No message available", e, request);
     }
 
     private ResponseEntity<Map<String, Object>> body(HttpStatusCode status, String message, Exception e,

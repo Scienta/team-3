@@ -80,6 +80,27 @@ class CompatibilityTest {
     }
 
     @Test
+    void unknownPathsSayNoMessageAvailable() throws Exception {
+        for (String path : new String[]{"/nope", "/TALKS", "//talks"}) {
+            HttpResponse<String> res = send("GET", path, null);
+            assertEquals(404, res.statusCode(), path);
+            assertEquals(JSON_UTF8, contentType(res), path);
+            assertTrue(res.body().matches("\\{\"timestamp\":\"" + TIMESTAMP + "\",\"status\":404,\"error\":\"Not Found\","
+                    + "\"message\":\"No message available\",\"path\":\"" + path + "\"}"), res.body());
+        }
+    }
+
+    @Test
+    void contentAfterTheJsonBodyIsIgnored() throws Exception {
+        HttpResponse<String> garbage = send("POST", "/speakers",
+                "{\"name\":\"Tr\",\"email\":\"tr-" + UUID.randomUUID() + "@example.com\"} trailing");
+        assertEquals(201, garbage.statusCode(), garbage.body());
+        HttpResponse<String> second = send("POST", "/speakers",
+                "{\"name\":\"Tr\",\"email\":\"tr-" + UUID.randomUUID() + "@example.com\"}{\"x\":1}");
+        assertEquals(201, second.statusCode(), second.body());
+    }
+
+    @Test
     void validationErrorsStillListTheFields() throws Exception {
         HttpResponse<String> res = send("POST", "/speakers", "{\"email\":\"x@example.com\"}");
         assertEquals(400, res.statusCode());
