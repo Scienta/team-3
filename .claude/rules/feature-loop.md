@@ -79,7 +79,7 @@ leave the branch local for a person to review and merge (merging to `main` is wh
 
 ### 4. Plan — mirror the existing shape
 
-The stack is Spring Boot 2.7 / Java 11, plain `JdbcTemplate`, no ORM. Follow the patterns already here:
+The stack is Spring Boot 4 / Java 17 (Jackson 3: `tools.jackson.*`; `jakarta.*` not `javax.*`; responses kept Boot-2.7-compatible by `CompatibilityConfig`, pinned by `CompatibilityTest`), plain `JdbcTemplate`, no ORM. Follow the patterns already here:
 
 - **Schema**: append to `src/main/resources/schema.sql` only — every statement `IF NOT EXISTS`, never
   edit old ones (it runs on every start-up).
