@@ -17,6 +17,14 @@ name: deploy
 on:
   push:
     branches: [main]
+    # A redeploy restarts the container and can fail a tick of checks, so pushes that only touch
+    # docs, workflow notes, agent config or Hurl examples don't deploy. Run it by hand if needed.
+    paths-ignore:
+      - '**/*.md'
+      - 'workflow/**'
+      - '.claude/**'
+      - 'examples/**'
+      - 'specs/**'
   workflow_dispatch:
 
 # One deploy at a time; a newer push waits rather than cancelling a deploy halfway.

@@ -222,11 +222,11 @@ class AcceptanceTest {
         assertEquals("WITHDRAWN", currentStatus(withdrawn));
     }
 
-    // a waitlisted talk may be waitlisted again: a legal no-op that stays WAITLISTED
+    // a waitlisted talk can only be accepted or rejected later, not waitlisted again
     @Test
-    void waitlistingAWaitlistedTalkIsAllowed() throws Exception {
+    void waitlistingAWaitlistedTalkIsRefused() throws Exception {
         long talk = inState("WAITLISTED", newSpeaker());
-        assertEquals(200, status(talk, "WAITLISTED").statusCode());
+        assertEquals(409, status(talk, "WAITLISTED").statusCode());
         assertEquals("WAITLISTED", currentStatus(talk));
     }
 

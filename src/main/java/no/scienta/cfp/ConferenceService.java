@@ -298,7 +298,7 @@ public class ConferenceService {
 
     static {
         DECISION_TARGETS.put("SUBMITTED", new HashSet<>(DECISIONS));
-        DECISION_TARGETS.put("WAITLISTED", new HashSet<>(DECISIONS));
+        DECISION_TARGETS.put("WAITLISTED", new HashSet<>(Arrays.asList("ACCEPTED", "REJECTED")));  // not again
         DECISION_TARGETS.put("ACCEPTED", Collections.emptySet());
         DECISION_TARGETS.put("REJECTED", Collections.emptySet());
         DECISION_TARGETS.put("WITHDRAWN", Collections.emptySet());
