@@ -37,8 +37,8 @@ public class ProgrammeService {
     public ProgrammeEntry place(String room, String slot, Map<String, Object> body) {
         requireRoomAndSlot(room, slot);
         Object raw = body == null ? null : body.get("talkId");
-        if (!(raw instanceof Number)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "talkId is required");
+        if (!(raw instanceof Integer || raw instanceof Long)) {   // 1.5, "7" or true is not a talk id
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "talkId must be a whole number");
         }
         long talkId = ((Number) raw).longValue();
 

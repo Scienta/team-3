@@ -152,6 +152,11 @@ class SchedulingTest {
         assertEquals(404, put("R0", "S2", 1L).statusCode());
         assertEquals(404, put("R2", "slot2", 1L).statusCode());
         assertEquals(400, put("R1", "S1", null).statusCode());       // missing talkId
+        for (String body : new String[]{"{\"talkId\":1.5}", "{\"talkId\":\"1\"}", "{\"talkId\":true}",
+                "{\"talkId\":null}"}) {
+            assertEquals(400, http.send(req("PUT", "/programme/R1/S1", body),
+                    HttpResponse.BodyHandlers.ofString()).statusCode(), body);
+        }
         assertEquals(400, put("R1", "S1", 99999999L).statusCode());  // unknown talk in the body
     }
 
