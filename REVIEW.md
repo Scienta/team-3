@@ -112,3 +112,5 @@ of its steps wrote here, so at 14:30 this file was still the organisers' templat
 iteration's report had gone to a terminal and been lost. Now the loop's last step appends to the log.
 A second, smaller one: test error *precedence* (404 before 400) and repeat transitions as part of
 the checklist, since those are what the harness caught after we claimed.
+
+**Update, 15:20: write lessons where the agents read them.** Every repeat fault was a lesson we had already learned that sat in a commit message. They now live in [`.claude/rules/house-conventions.md`](.claude/rules/house-conventions.md) (status-code precedence, no session-level SETs, concurrency tests, a pre-claim gate against the deployed URL, grab before fixing), which every agent loads at start-up, and the feature loop's regression review starts from it.
