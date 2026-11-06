@@ -12,6 +12,7 @@
 #
 # Usage:
 #   workflow/allocate.sh grab    <task>   # exit 0 grabbed, 10 already taken, 11 kept losing the race
+#                                          # ("claim" still works as an alias; the ledger event stays "claimed")
 #   workflow/allocate.sh done    <task>   # release after finishing a feature
 #   workflow/allocate.sh release <task>   # release when giving up / iteration ended early
 #   workflow/allocate.sh status           # current owner of every task
@@ -151,7 +152,9 @@ cmd_grab() {
             STALE) append_event "$task" "released" ;;   # free the dead grab, then grab below
             FREE)  : ;;
         esac
-        append_event "$task" "grabbed"
+        # Written as "claimed", not "grabbed": scripts from before the rename only treat "claimed" as owned,
+        # so a teammate who hasn't pulled would see a "grabbed" task as free and build it twice.
+        append_event "$task" "claimed"
         git -C "$WT" add "$FILE"
         git -C "$WT" commit -q -m "grab $task by $MEMBER"
         if git -C "$WT" push -q "$REMOTE" "HEAD:$BRANCH" 2>/dev/null; then
@@ -238,7 +241,7 @@ usage() {
 main() {
     local cmd="${1:-}"
     case "$cmd" in
-        grab)    [ $# -eq 2 ] || usage; cmd_grab "$2" ;;
+        grab|claim) [ $# -eq 2 ] || usage; cmd_grab "$2" ;;   # claim: the old name, kept so older rules/agents still work
         done)    [ $# -eq 2 ] || usage; cmd_free "$2" "done" ;;
         release) [ $# -eq 2 ] || usage; cmd_free "$2" "released" ;;
         status)  cmd_report "all" ;;

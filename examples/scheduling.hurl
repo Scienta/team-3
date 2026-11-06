@@ -130,3 +130,10 @@ HTTP 404
 # Empty cell
 GET {{base_url}}/programme/R3/S5
 HTTP 404
+
+# Clean up: take our talks out again, so the file can run twice against the same database (and leaves the
+# deployed programme as it found it)
+DELETE {{base_url}}/programme/R2/S2
+HTTP 204
+DELETE {{base_url}}/programme/R1/S4
+HTTP 204

@@ -24,8 +24,9 @@ One event per line, append-only. The current owner of a task is the **last event
 {"ts":"2026-11-06T14:05:00Z","task":"acceptance","member":"mk@scienta.no","host":"mk-laptop","status":"done"}
 ```
 
-- `status`: `grabbed` → owned; `released` / `done` → free again. (Legacy `claimed` events are still read
-  as owned, for ledgers written before the rename.)
+- `status`: `claimed` or `grabbed` → owned; `released` / `done` → free again. `grab` still **writes**
+  `claimed`: the script from before the rename only reads `claimed` as owned, so writing `grabbed` would let
+  a teammate who hasn't pulled build the same task. `allocate.sh claim` remains an alias for `grab`.
 - `member`: identity, from `git config user.email` (override with `$MEMBER`).
 - A `grabbed` event older than the TTL (default 2 h) counts as **stale → free**, so a crashed machine
   never wedges a task. Reclaiming one writes a `released` (expired) event first, then the new grab.
