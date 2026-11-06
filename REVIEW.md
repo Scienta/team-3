@@ -94,6 +94,8 @@ loads at start-up on every machine.
 
 - **scheduling/check-1 green at tick 180** after 24 FAULTY ticks, peeled one request at a time: 404 for an unknown room/slot in the path (`bb07d17`), 400 for a nonexistent `talkId` in the body (`ad088ea`), 400 for a non-integer `talkId` (`a67bdae`), and 404 for deleting an empty cell (`bbb3d7f`, tick 174). Each fix only revealed the next failing request, because the check stops at its first failure. **Lesson:** list every error and repeat case up front (house-conventions §1A) instead of discovering them one deploy at a time.
 
+- **af41c5f, our own process slip (no harness impact).** A one-line comment edit after the green build broke compilation, and the ratings-cr merge went out anyway, because the merge command ran after the build with `;` instead of `&&`. The deploy failed at its build step, so production stayed on the previous version; fixed in `50e44d2`. New rule in house-conventions §5: merge only what you just built, gated in the same command.
+
 ## 5. Reusable artifacts
 
 - [`.claude/rules/feature-loop.md`](.claude/rules/feature-loop.md): the spec → decisions →
