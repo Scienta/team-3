@@ -278,6 +278,16 @@ public class ConferenceService {
             if (current.size() >= 2) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "a talk can have at most two co-speakers");
             }
+            // Co-speaking on a talk still in the running counts towards the speaker's cap; on a rejected or withdrawn
+            // talk it doesn't. Lock order is talk, then speaker; submissions lock only the speaker, so no deadlock.
+            String status = talkDao.findById(talkId).status;
+            if (!"REJECTED".equals(status) && !"WITHDRAWN".equals(status)) {
+                talkDao.lockSpeaker(speakerId);
+                if (talkDao.activeTalks(speakerId) >= Utils.MAX_TALKS) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "speaker " + speakerId + " already presents " + Utils.MAX_TALKS + " talks");
+                }
+            }
             coSpeakerDao.insert(talkId, speakerId);
         }
         return getTalk(talkId);

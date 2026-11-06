@@ -71,18 +71,38 @@ public class TalkDao {
                 "SELECT COUNT(DISTINCT t.speaker_id) FROM talk t JOIN speaker s ON s.id = t.speaker_id", Integer.class);
     }
 
+    // The talks that count towards a speaker's cap (submission-cap change request): every talk they present, as main
+    // speaker or co-speaker, that is still in the running, i.e. not REJECTED or WITHDRAWN.
+    private static final String ACTIVE_TALKS_OF_SPEAKER = "SELECT COUNT(*) FROM talk t "
+            + "WHERE t.status NOT IN ('REJECTED', 'WITHDRAWN') "
+            + "AND (t.speaker_id = ? OR EXISTS (SELECT 1 FROM co_speaker c WHERE c.talk_id = t.id AND c.speaker_id = ?))";
+
     /**
-     * Inserts the talk only if the speaker has fewer than {@code max} talks. Returns the new id, or null.
-     * The speaker row is locked first so two submissions for the same speaker can't both see room under the limit.
+     * Locks the speaker's row for the rest of the transaction. Every change to a speaker's cap (a submission, or being
+     * added as a co-speaker) takes this lock before counting, so concurrent ones can't both see room under the limit.
+     */
+    public void lockSpeaker(long speakerId) {
+        jdbc.queryForList("SELECT id FROM speaker WHERE id = ? FOR UPDATE", speakerId);
+    }
+
+    /** How many talks count towards this speaker's cap; see {@link #ACTIVE_TALKS_OF_SPEAKER}. */
+    public int activeTalks(long speakerId) {
+        Integer n = jdbc.queryForObject(ACTIVE_TALKS_OF_SPEAKER, Integer.class, speakerId, speakerId);
+        return n == null ? 0 : n;
+    }
+
+    /**
+     * Inserts the talk only if fewer than {@code max} talks count towards the speaker's cap. Returns the new id, or
+     * null. The speaker row is locked first (see {@link #lockSpeaker}).
      */
     @Transactional
     public Long insertIfBelow(int max, String title, String format, int duration, String level, long speakerId, long submittedAt) {
-        jdbc.queryForList("SELECT id FROM speaker WHERE id = ? FOR UPDATE", speakerId);
+        lockSpeaker(speakerId);
         List<Long> ids = jdbc.queryForList(
                 "INSERT INTO talk (title, format, duration, level, status, speaker_id, submitted_at) "
                         + "SELECT ?, ?, ?, ?, 'SUBMITTED', ?, ? "
-                        + "WHERE (SELECT COUNT(*) FROM talk WHERE speaker_id = ?) < ? RETURNING id",
-                Long.class, title, format, duration, level, speakerId, submittedAt, speakerId, max);
+                        + "WHERE (" + ACTIVE_TALKS_OF_SPEAKER + ") < ? RETURNING id",
+                Long.class, title, format, duration, level, speakerId, submittedAt, speakerId, speakerId, max);
         return ids.isEmpty() ? null : ids.get(0);
     }
 

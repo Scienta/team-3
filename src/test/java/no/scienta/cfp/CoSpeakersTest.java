@@ -134,23 +134,16 @@ class CoSpeakersTest {
     }
 
     @Test
-    void coSpeakingDoesNotUseUpTheSubmissionLimitOrShowInOwnTalks() throws Exception {
+    void coSpeakingDoesNotShowInOwnTalks() throws Exception {
+        // (the submission cap now counts co-speaking too: see SubmissionCapTest)
         long main = newSpeaker();
         long busy = newSpeaker();
-        // busy reaches the 3-talk limit as a main speaker
         long talkA = newTalk(busy);
-        newTalk(busy);
-        newTalk(busy);
-        HttpResponse<String> fourth = http.send(req("POST", "/talks", talkJson(busy)),
-                HttpResponse.BodyHandlers.ofString());
-        assertEquals(409, fourth.statusCode(), fourth.body());
-
-        // ...yet can still co-speak on someone else's talk
         long talk = newTalk(main);
         assertEquals(200, put("/talks/" + talk + "/co-speakers/" + busy).statusCode());
 
-        // and co-speaking does not add to busy's own talk list (only main-speaker talks)
-        assertEquals(3, countIds(get("/speakers/" + busy + "/talks")));
+        // co-speaking does not add to busy's own talk list (only main-speaker talks)
+        assertEquals(1, countIds(get("/speakers/" + busy + "/talks")));
         assertTrue(get("/speakers/" + busy + "/talks").contains("\"id\":" + talkA));
     }
 
