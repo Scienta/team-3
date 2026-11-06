@@ -53,7 +53,7 @@ loads at start-up on every machine.
 
 ## 3. Claim log
 
-One row per feature, current as of tick 194 (15:42). The harness shows a feature's checks only after the claim, so
+One row per feature, current as of tick 211 (15:59). The harness shows a feature's checks only after the claim, so
 "evidence before claiming" is what we held at the moment a person pressed the button.
 
 | Feature | Claimed or skipped | Tick | Evidence before claiming |
@@ -66,7 +66,7 @@ One row per feature, current as of tick 194 (15:42). The harness shows a feature
 | scheduling | claimed | 156 | `SchedulingTest` + `examples/scheduling.hurl` green. **Not enough:** check-1 FAULTY ticks 157–179, failing one error case at a time (path 404, body 400, wrong type 400, DELETE of an empty cell 404, see §4); 6/6 OK from tick 180 |
 | programme-export | claimed | 189 | `ProgrammeExportTest` (9) + `examples/programme-export.hurl`, run for real through Hurl in Docker (found two bugs in the example itself). 3/3 OK after claiming. Its REPEATABLE READ transaction caused the 14:07 incident before it was claimed (see §4) |
 | ratings-cr | claimed | 194 | `RatingsCrTest` (exact banker's rounding + every view + ranking) + `examples/ratings-cr.hurl` green; first **independent reviewer** run (house-conventions §1B): 8/8 requirements covered, no violations; live check on the deployed service: 5,5,5,1,1 gives 3.67 with ratingCount 5. Its checks hadn't run yet at tick 194 |
-| submission-cap-cr | ready to claim (person to confirm) after merge + deploy; branch `feature/submission-cap-cr` | 191 | `SubmissionCapTest` (11, incl. a submissions+invites rush that fails without the speaker lock: 5–6 instead of 3) + `examples/submission-cap-cr.hurl`; 104 tests green; independent reviewer (§1B) found no logic, deadlock or 500 path, its 3 test gaps (over-cap speaker, withdrawn co-spoken talk, accepted counts) added |
+| submission-cap-cr | claimed | 199 | `SubmissionCapTest` (11, incl. a submissions+invites rush that fails without the speaker lock: 5–6 instead of 3) + `examples/submission-cap-cr.hurl`; independent reviewer (§1B) found no logic, deadlock or 500 path, its 3 test gaps added. **Claimed before the merge**, so ticks 200–202 ran on the old code (see §4); deployed 14:49, 4/4 from tick 204 |
 
 ## 4. What the harness caught that we didn't
 
