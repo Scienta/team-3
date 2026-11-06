@@ -98,6 +98,8 @@ One row per feature, current as of tick 194 (15:42). The harness shows a feature
 
 - **af41c5f, our own process slip (no harness impact).** A one-line comment edit after the green build broke compilation, and the ratings-cr merge went out anyway, because the merge command ran after the build with `;` instead of `&&`. The deploy failed at its build step, so production stayed on the previous version; fixed in `50e44d2`. New rule in house-conventions §5: merge only what you just built, gated in the same command.
 
+- **acceptance/check-5, ticks 193–194 (note `2x`): not our code.** The check fires 16 concurrent decisions at one talk. The deployed log shows our service received 13 and answered all correctly within 48 ms (exactly one 200, twelve 409s); the 3 requests the harness marks with no response never reached the container. That points at the platform ingress under the doubled load, which is outside our hands-off line. Raised with the organisers rather than "fixed".
+
 ## 5. Reusable artifacts
 
 - [`.claude/rules/feature-loop.md`](.claude/rules/feature-loop.md): the spec → decisions →
