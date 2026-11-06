@@ -1,12 +1,15 @@
 package no.scienta.cfp;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -21,11 +24,13 @@ public class ProgrammeService {
     private final TalkDao talkDao;
     private final CoSpeakerDao coSpeakerDao;
     private final ProgrammeDao programmeDao;
+    private final SpeakerDao speakerDao;
 
-    public ProgrammeService(TalkDao talkDao, CoSpeakerDao coSpeakerDao, ProgrammeDao programmeDao) {
+    public ProgrammeService(TalkDao talkDao, CoSpeakerDao coSpeakerDao, ProgrammeDao programmeDao, SpeakerDao speakerDao) {
         this.talkDao = talkDao;
         this.coSpeakerDao = coSpeakerDao;
         this.programmeDao = programmeDao;
+        this.speakerDao = speakerDao;
     }
 
     @Transactional
@@ -86,6 +91,42 @@ public class ProgrammeService {
         requireRoomAndSlot(room, slot);
         programmeDao.lockSlot(slot);
         programmeDao.remove(room, slot);                   // idempotent: no-op if already empty
+    }
+
+    /**
+     * The programme export: one row per scheduled talk, in programme order, with the talk and its speakers as
+     * they are now. Speaker names are fetched in one batch (pool is capped at 5, no N+1). A single read-only
+     * REPEATABLE READ transaction makes the three queries see the same snapshot, so a row can't pair a talk
+     * with co-speakers from a later moment.
+     */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public List<ProgrammeRow> export() {
+        List<ProgrammeRow> rows = programmeDao.findAll();
+        List<Long> talkIds = new ArrayList<>();
+        Set<Long> speakerIds = new LinkedHashSet<>();
+        for (ProgrammeRow row : rows) {
+            talkIds.add(row.talkId);
+            speakerIds.add(row.mainSpeakerId);
+        }
+        Map<Long, List<Long>> coSpeakers = coSpeakerDao.findByTalks(talkIds);
+        coSpeakers.values().forEach(speakerIds::addAll);
+        Map<Long, String> names = speakerDao.findNames(speakerIds);
+        for (ProgrammeRow row : rows) {
+            Venue.SlotTime t = Venue.slot(row.slot);
+            row.start = t.start;
+            row.end = t.end;
+            addName(row, names.get(row.mainSpeakerId));
+            for (Long co : coSpeakers.getOrDefault(row.talkId, List.of())) {
+                addName(row, names.get(co));
+            }
+        }
+        return rows;
+    }
+
+    private static void addName(ProgrammeRow row, String name) {
+        if (name != null) {                                // speakers can't be deleted; guard anyway
+            row.speakers.add(name);
+        }
     }
 
     private Set<Long> peopleOf(long talkId, long mainSpeakerId) {
