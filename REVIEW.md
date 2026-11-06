@@ -53,18 +53,19 @@ loads at start-up on every machine.
 
 ## 3. Claim log
 
+One row per feature, current as of tick 194 (15:42). The harness shows a feature's checks only after the claim, so
+"evidence before claiming" is what we held at the moment a person pressed the button.
+
 | Feature | Claimed or skipped | Tick | Evidence before claiming |
 |---|---|---|---|
 | speakers, talks, ratings | claimed (base) | 0 | Base features, pre-claimed. Whole-project review at 13:10 fixed SQL injection, N+1 and rounding before any fault |
-| co-speakers | claimed | 85 | `CoSpeakersTest` + `examples/co-speakers.hurl` green. **Not enough:** checks 1 and 2 went FAULTY at ticks 86–91 (see §4) |
-| acceptance | claimed | 100 | `AcceptanceTest` + `examples/acceptance.hurl` green, regression review against talks/co-speakers. check-3 later flickered (see §4) |
-| spring-boot-4 | claimed | 124 | Merged to `main` at 14:14 and deployed. All base, co-speakers and acceptance checks stayed green through the migration; `CompatibilityTest` + `TalkShapeRegressionTest` pin the Boot 2.7 behaviour. 2/2 checks OK after claiming |
-| scheduling | in progress, allocated in ledger 13:11Z (teammate) | – | Branch `feature/scheduling`; not yet merged or claimed |
-| workshop-registration | in progress, allocated in ledger 13:33Z (teammate) | – | Spec v2: capacity 20 under a rush (needs a row lock + concurrency test), case-insensitive email uniqueness; not yet merged or claimed |
-| workshop-registration | ready to claim (person to confirm), branch `feature/workshop-registration` not merged | 129 | `WorkshopRegistrationTest` (9 tests incl. a 45-request rush) + `examples/workshop-registration.hurl` green; all 6 Hurl files green locally; 60-request rush on the real jar gave exactly 20 × 201; regression review vs talks/acceptance/co-speakers: Talk shape unchanged, withdrawn workshop keeps its list |
-| programme-export | allocated in ledger 13:40Z (us, 14 s after release at tick 133); **blocked** | – | Reads the programme that scheduling writes; scheduling isn't on `main` yet, so the export (and its harness checks, which fill the programme via `PUT /programme/{room}/{slot}`) waits for it |
-| programme-export | built on `feature/programme-export` (stacked on `feature/scheduling`); **ready to claim once both are merged and deployed** | – | `ProgrammeExportTest` (9 tests: order, slot times, speaker order, live renames/co-speaker changes/withdrawn talks, RFC 4180 quoting, UTF-8, `text/csv` for `Accept: application/json`, LF endings, empty programme) + `examples/programme-export.hurl` (not run: no Hurl here); full build 90 tests green |
+| co-speakers | claimed | 85 | `CoSpeakersTest` + `examples/co-speakers.hurl` green. **Not enough:** checks 1 and 2 went FAULTY at ticks 86–91 (400 instead of 404, see §4) |
+| acceptance | claimed | 100 | `AcceptanceTest` + `examples/acceptance.hurl` green, regression review against talks/co-speakers. check-3 later failed on a repeated WAITLISTED (see §4) |
+| spring-boot-4 | claimed | 124 | Merged at 14:14 and deployed; all base, co-speakers and acceptance checks stayed green through the migration; `CompatibilityTest` + `TalkShapeRegressionTest` pin Boot 2.7 behaviour. 2/2 OK after claiming |
 | workshop-registration | claimed | 147 | Fix `122d027` deployed first. 4/4 green from the first run (ticks 148–149), no points bled. Evidence: `WorkshopRegistrationTest` + `examples/workshop-registration.hurl`, and the harness's own pre-claim sequences in the request log all ran to their closing `GET` |
+| scheduling | claimed | 156 | `SchedulingTest` + `examples/scheduling.hurl` green. **Not enough:** check-1 FAULTY ticks 157–179, failing one error case at a time (path 404, body 400, wrong type 400, DELETE of an empty cell 404, see §4); 6/6 OK from tick 180 |
+| programme-export | claimed | 189 | `ProgrammeExportTest` (9) + `examples/programme-export.hurl`, run for real through Hurl in Docker (found two bugs in the example itself). 3/3 OK after claiming. Its REPEATABLE READ transaction caused the 14:07 incident before it was claimed (see §4) |
+| ratings-cr | claimed | 194 | `RatingsCrTest` (exact banker's rounding + every view + ranking) + `examples/ratings-cr.hurl` green; first **independent reviewer** run (house-conventions §1B): 8/8 requirements covered, no violations; live check on the deployed service: 5,5,5,1,1 gives 3.67 with ratingCount 5. Its checks hadn't run yet at tick 194 |
 | submission-cap-cr | ready to claim (person to confirm) after merge + deploy; branch `feature/submission-cap-cr` | 191 | `SubmissionCapTest` (11, incl. a submissions+invites rush that fails without the speaker lock: 5–6 instead of 3) + `examples/submission-cap-cr.hurl`; 104 tests green; independent reviewer (§1B) found no logic, deadlock or 500 path, its 3 test gaps (over-cap speaker, withdrawn co-spoken talk, accepted counts) added |
 
 ## 4. What the harness caught that we didn't
