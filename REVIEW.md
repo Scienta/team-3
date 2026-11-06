@@ -61,6 +61,7 @@ loads at start-up on every machine.
 | spring-boot-4 | claimed | 124 | Merged to `main` at 14:14 and deployed. All base, co-speakers and acceptance checks stayed green through the migration; `CompatibilityTest` + `TalkShapeRegressionTest` pin the Boot 2.7 behaviour. 2/2 checks OK after claiming |
 | scheduling | in progress, allocated in ledger 13:11Z (teammate) | – | Branch `feature/scheduling`; not yet merged or claimed |
 | workshop-registration | in progress, allocated in ledger 13:33Z (teammate) | – | Spec v2: capacity 20 under a rush (needs a row lock + concurrency test), case-insensitive email uniqueness; not yet merged or claimed |
+| workshop-registration | ready to claim (person to confirm), branch `feature/workshop-registration` not merged | 129 | `WorkshopRegistrationTest` (9 tests incl. a 45-request rush) + `examples/workshop-registration.hurl` green; all 6 Hurl files green locally; 60-request rush on the real jar gave exactly 20 × 201; regression review vs talks/acceptance/co-speakers: Talk shape unchanged, withdrawn workshop keeps its list |
 
 ## 4. What the harness caught that we didn't
 
