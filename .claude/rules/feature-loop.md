@@ -13,6 +13,10 @@ iteration does **one** feature. Loop again for the next. See `AGENTS.md` for the
   before any edits (step 2). Committing to that branch is fine. **Never** merge to `main`, push `main`,
   or otherwise deploy without being asked — pushing to `main` deploys. Leave the branch for a person to
   review and merge.
+- **Claim before building.** Teammates run this loop on their own machines too. Grab a task with
+  `workflow/allocate.sh claim <slug>` before branching, and `release`/`done` it when the iteration ends,
+  so two people never build the same feature (step 1). That pushes only the `agent-allocations` ledger
+  branch — never `main` — and is the one push the loop may make unasked.
 - **Never touch the hands-off list** (`AGENTS.md` → "Hands off"): `.fagdag/` committed files, the
   `SCW_*`/`TEAM_URL` secrets and variables, the deploy workflow's org config, anything outside this
   team's own service. Never print or commit `.fagdag/harness-token`.
@@ -29,6 +33,9 @@ iteration does **one** feature. Loop again for the next. See `AGENTS.md` for the
   `curl -fsS -H "Authorization: Bearer $(cat .fagdag/harness-token)" "$(cat .fagdag/harness-url)/specs/speakers/spec.md"` returns 200.
 - Docker is running (tests use Testcontainers Postgres).
 - Harness is rate-limited: bursts of 5 then ~1 req/s; `429` carries `Retry-After`. Space calls out.
+- Allocation is coordinated with teammates through `workflow/allocate.sh` (an append-only ledger on the
+  `agent-allocations` branch; see `workflow/task-allocation.md`). Your git identity (`git config
+  user.email`, or `$MEMBER`) names your claims, and you need push access to that branch.
 
 ## The loop
 
@@ -42,7 +49,7 @@ curl -fsS -H "Authorization: Bearer $TOKEN" "$H/specs" | grep -oE '/specs/[a-z0-
 curl -fsS -H "Authorization: Bearer $TOKEN" "$H/api/teams/$TEAM/feedback"
 ```
 
-Compare the two. Pick one target, in this priority order:
+Compare the two and build an **ordered list of candidates**, highest priority first:
 1. **FAULTY checks on a claimed feature** (regressions bleed points) — fix first.
 2. **A released, unclaimed feature with no checks passing** (new points).
 3. **A partially-passing feature** (finish it).
@@ -51,11 +58,19 @@ For a FAULTY check, pull the failing request and transcript:
 ```bash
 curl -fsS -H "Authorization: Bearer $TOKEN" "$H/api/teams/$TEAM/feedback/timeline?check=<feature>/<check>"
 ```
-If nothing is actionable (all released specs done, no faults), **end the iteration** and report that.
+
+Then **claim the first candidate you can**, so teammates running this loop don't build the same thing.
+Walk the list in priority order and try to grab each:
+```bash
+workflow/allocate.sh claim <slug>    # exit 0 = it's yours; 10 = a teammate has it; 11 = contention, retry later
+```
+Take the first candidate that exits `0` as this iteration's target. On exit `10`, move to the next
+candidate. If nothing is actionable (all released specs done, no faults) **or** every candidate is
+already claimed by a teammate, **end the iteration** and report that — back off without claiming anything.
 
 ### 2. Branch — isolate the work
 
-Once a target is picked and **before any edits**, cut a fresh feature branch off an up-to-date `main`.
+Once a target is claimed (step 1) and **before any edits**, cut a fresh feature branch off an up-to-date `main`.
 All of this iteration's work (code, tests, examples) stays on that branch; one branch per feature.
 
 ```bash
@@ -166,6 +181,7 @@ Build: ./mvnw package -> SUCCESS (N tests, 0 failures)   [or the failure output]
 Regression review: specs re-read [<done-slugs>]; interactions found [<none | …>];
   regression tests added [<none | names>]; all prior tests pass
 Branch: feature/<slug>  (not merged, not pushed)
+Allocation: claimed via agent-allocations ledger; released/done at iteration end
 Files changed: <list>
 Open questions for the product owner: <none | …>
 
@@ -175,6 +191,10 @@ Evidence: passing tests above + (once deployed) green harness checks for <slug>.
 ```
 
 ### 10. Next iteration
+
+**Release the allocation** so teammates aren't blocked: `workflow/allocate.sh done <slug>` when the
+feature was implemented, or `release <slug>` if the iteration ended before finishing. Do this even when
+the run failed or you backed off after claiming.
 
 Report, then stop that iteration, leaving the feature branch in place for a person to review and merge.
 The loop picks the next target on the following run — starting again from an up-to-date `main` (step 2),
