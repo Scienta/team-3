@@ -85,6 +85,9 @@ loads at start-up on every machine.
 - **Not a harness catch, but close:** `withdraw` with a non-integer `speakerId` returned a 500
   (`1374ed5`, fixed to 400).
 
+- **workshop-registration, before claim (talks 5006, 5059, 5116):** registering on an *accepted* talk that isn't a workshop got our 404 ("no such workshop"), and the harness's sequence stopped there, with no closing `GET`, unlike every other refusal. The spec has one rule, "only workshops that the committee has accepted take registrations", and the harness already took 409 for "not accepted". Switched to 409 (and `GET` → `[]`) in `122d027`; the next run (talk 5429) went on to its `GET`. Claimed afterwards with 4/4 green and nothing bled.
+  **Why we missed it:** we read `/workshops/{id}` as "the id must be a workshop" (404) instead of following the spec's single rule. **What helped:** reading the harness's unclaimed traffic in the request log before claiming. A sequence that stops right after our answer is a likely fault.
+
 ## 5. Reusable artifacts
 
 - [`.claude/rules/feature-loop.md`](.claude/rules/feature-loop.md): the spec → decisions →
