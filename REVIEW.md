@@ -62,6 +62,7 @@ loads at start-up on every machine.
 | scheduling | in progress, allocated in ledger 13:11Z (teammate) | – | Branch `feature/scheduling`; not yet merged or claimed |
 | workshop-registration | in progress, allocated in ledger 13:33Z (teammate) | – | Spec v2: capacity 20 under a rush (needs a row lock + concurrency test), case-insensitive email uniqueness; not yet merged or claimed |
 | workshop-registration | ready to claim (person to confirm), branch `feature/workshop-registration` not merged | 129 | `WorkshopRegistrationTest` (9 tests incl. a 45-request rush) + `examples/workshop-registration.hurl` green; all 6 Hurl files green locally; 60-request rush on the real jar gave exactly 20 × 201; regression review vs talks/acceptance/co-speakers: Talk shape unchanged, withdrawn workshop keeps its list |
+| programme-export | allocated in ledger 13:40Z (us, 14 s after release at tick 133); **blocked** | – | Reads the programme that scheduling writes; scheduling isn't on `main` yet, so the export (and its harness checks, which fill the programme via `PUT /programme/{room}/{slot}`) waits for it |
 
 ## 4. What the harness caught that we didn't
 
