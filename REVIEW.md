@@ -51,6 +51,8 @@ loads at start-up on every machine.
   gate: we read FAULTY transcripts through the feedback API and the request log
   (`RequestLoggingFilter` + `.github/fagdag/logs.sh`).
 
+- **Whole-application `/code-review` at 15:50** (10 findings). We fixed 8 on one branch, one deploy: a 500 on huge reviewer ids, `/health` reporting `db-unavailable` when the pool was busy, inexact stats, CSV escaping, three lock helpers merged into one, id lists past the driver's 65,535-parameter limit, 1970 dates. Each got a test that **fails on the old code** (run in a worktree of `main`). One finding was dismissed because the spec requires that behaviour. The independent reviewer then caught a stale long-lived health connection before production.
+
 ## 3. Claim log
 
 One row per feature, current as of tick 211 (15:59). The harness shows a feature's checks only after the claim, so
