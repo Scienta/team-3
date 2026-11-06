@@ -58,9 +58,9 @@ loads at start-up on every machine.
 | speakers, talks, ratings | claimed (base) | 0 | Base features, pre-claimed. Whole-project review at 13:10 fixed SQL injection, N+1 and rounding before any fault |
 | co-speakers | claimed | 85 | `CoSpeakersTest` + `examples/co-speakers.hurl` green. **Not enough:** checks 1 and 2 went FAULTY at ticks 86–91 (see §4) |
 | acceptance | claimed | 100 | `AcceptanceTest` + `examples/acceptance.hurl` green, regression review against talks/co-speakers. check-3 later flickered (see §4) |
-| spring-boot-4 | merged 14:14, **not yet claimed** | – | Merged to `main`; all checks still green. `CompatibilityTest` pins the Boot 2.7 behaviour. Waiting on a person's decision to claim |
-| scheduling | in progress (teammate, ledger 13:11) | – | Branch `feature/scheduling` |
-| workshop-registration | not started | – | – |
+| spring-boot-4 | claimed | 124 | Merged to `main` at 14:14 and deployed. All base, co-speakers and acceptance checks stayed green through the migration; `CompatibilityTest` + `TalkShapeRegressionTest` pin the Boot 2.7 behaviour. 2/2 checks OK after claiming |
+| scheduling | in progress, allocated in ledger 13:11Z (teammate) | – | Branch `feature/scheduling`; not yet merged or claimed |
+| workshop-registration | in progress, allocated in ledger 13:33Z (teammate) | – | Spec v2: capacity 20 under a rush (needs a row lock + concurrency test), case-insensitive email uniqueness; not yet merged or claimed |
 
 ## 4. What the harness caught that we didn't
 
