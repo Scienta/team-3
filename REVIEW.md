@@ -121,6 +121,8 @@ One row per feature, current as of tick 211 (15:59). The harness shows a feature
 
 - [`.claude/rules/house-conventions.md`](.claude/rules/house-conventions.md): principles distilled from every harness fault (status-code precedence, repeats by meaning, no connection state, invariants enforced by the DB), plus a **requirements review built into the loop**: a requirements table before code, an independent reviewer agent that sees only the spec and the diff before hand-over, and a pre-claim gate against the deployed URL. Reusable on any "the request isn't a spec" project.
 
+- [`workflow/architecture.md`](workflow/architecture.md): seven drawings for explaining the system. Who talks to what, push to production, the service's layers, the data model, a talk's life, **how a rush stays correct** (row lock + READ COMMITTED, and how the 14:07 incident broke it), and **how we work** (watcher → ledger → requirements table → independent reviewer → person merges → pre-claim gate → person claims). Mermaid, so GitHub renders it on screen; SVGs in `workflow/diagrams/`.
+
 ## 6. One thing we'd do differently
 
 Start the running log in the loop from minute one. We built a careful spec-to-report loop, but none
