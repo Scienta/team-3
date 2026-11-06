@@ -65,6 +65,7 @@ loads at start-up on every machine.
 | programme-export | allocated in ledger 13:40Z (us, 14 s after release at tick 133); **blocked** | – | Reads the programme that scheduling writes; scheduling isn't on `main` yet, so the export (and its harness checks, which fill the programme via `PUT /programme/{room}/{slot}`) waits for it |
 | programme-export | built on `feature/programme-export` (stacked on `feature/scheduling`); **ready to claim once both are merged and deployed** | – | `ProgrammeExportTest` (9 tests: order, slot times, speaker order, live renames/co-speaker changes/withdrawn talks, RFC 4180 quoting, UTF-8, `text/csv` for `Accept: application/json`, LF endings, empty programme) + `examples/programme-export.hurl` (not run: no Hurl here); full build 90 tests green |
 | workshop-registration | claimed | 147 | Fix `122d027` deployed first. 4/4 green from the first run (ticks 148–149), no points bled. Evidence: `WorkshopRegistrationTest` + `examples/workshop-registration.hurl`, and the harness's own pre-claim sequences in the request log all ran to their closing `GET` |
+| submission-cap-cr | ready to claim (person to confirm) after merge + deploy; branch `feature/submission-cap-cr` | 191 | `SubmissionCapTest` (11, incl. a submissions+invites rush that fails without the speaker lock: 5–6 instead of 3) + `examples/submission-cap-cr.hurl`; 104 tests green; independent reviewer (§1B) found no logic, deadlock or 500 path, its 3 test gaps (over-cap speaker, withdrawn co-spoken talk, accepted counts) added |
 
 ## 4. What the harness caught that we didn't
 
