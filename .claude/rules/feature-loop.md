@@ -54,24 +54,48 @@ curl -fsS -H "Authorization: Bearer $TOKEN" "$H/api/teams/$TEAM/feedback"
 ```
 
 Compare the two and build an **ordered list of candidates**, highest priority first:
-1. **FAULTY checks on a claimed feature** (regressions bleed points) — fix first. Grab it in the ledger
+1. **Regression bug tasks** — every FAULTY check on a *claimed* feature. A regression bleeds points each
+   tick, so it outranks all feature work and **must be cleared before any feature request** (see
+   "Regression bug tasks" below). Treat **each faulty check as its own task** with the deterministic id
+   `bug-<feature>-<check>` (e.g. `bug-ratings-check-3`) — deterministic so two members who spot the same
+   regression compute the same id and the ledger grab stops them both taking it. Grab it in the ledger
    before fixing, like a feature (two of us once wrote the same fix at the same time).
 2. **A released, unclaimed feature with no checks passing** (new points).
 3. **A partially-passing feature** (finish it).
 
-For a FAULTY check, pull the failing request and transcript:
+For a FAULTY check, pull the request it failed on and the transcript — the raw material for the bug report:
 ```bash
 curl -fsS -H "Authorization: Bearer $TOKEN" "$H/api/teams/$TEAM/feedback/timeline?check=<feature>/<check>"
 ```
 
-Then **grab the first candidate you can**, so teammates running this loop don't build the same thing.
-Walk the list in priority order and try to grab each (this is the ledger lock, *not* the harness claim):
+**Grab the first candidate you can**, highest priority first, so teammates running this loop don't take
+the same work (this is the ledger lock, *not* the harness claim). Use `bug-<feature>-<check>` as the id
+for a regression, or the feature `<slug>` for feature work:
 ```bash
-workflow/allocate.sh grab <slug>    # exit 0 = it's yours; 10 = a teammate has it; 11 = contention, retry later
+workflow/allocate.sh grab <id>    # exit 0 = it's yours; 10 = a teammate has it; 11 = contention, retry later
 ```
-Take the first candidate that exits `0` as this iteration's target. On exit `10`, move to the next
-candidate. If nothing is actionable (all released specs done, no faults) **or** every candidate is
-already claimed by a teammate, **end the iteration** and report that — back off without claiming anything.
+Take the first that exits `0` as this iteration's target. On exit `10`, move to the next. If nothing is
+actionable — no faults left to grab and no feature to build — **end the iteration** and report that,
+grabbing nothing. A regression you grab goes to **Regression bug tasks** next; a feature goes to step 2.
+
+### Regression bug tasks — clear before any feature
+
+A grabbed `bug-<feature>-<check>` task jumps ahead of all feature work. Work it like this, then return to
+step 1 (the loop keeps clearing regressions until none are grabbable before it builds a feature):
+
+1. **Report the problem.** From the transcript, write a short bug report: the faulty check and its
+   `bug-<feature>-<check>` id, the request it failed on (method + templated path), what our service
+   answered vs what the rule expects, and a root-cause hypothesis. Emit it in the iteration output and
+   log a line to `REVIEW.md` with `workflow/review-log.sh` so the team sees it.
+2. **Branch** `bugfix/<taskId>` off an up-to-date `main` (e.g. `bugfix/bug-ratings-check-3`) — same rules
+   as step 2, only the prefix differs; never work on `main`.
+3. **Reproduce, then fix.** Add a test that fails the way the check does, then fix it in the house style
+   (steps 4–5). If the fault only reproduces under platform behaviour local Testcontainers doesn't share
+   (e.g. a stricter DB isolation that raises `40001`), say so and get as close as you can — a focused
+   unit test of the fix logic counts.
+4. **Verify + regression review** (steps 7–8): `./mvnw package` green and no other feature regresses.
+5. **Emit the bug report** with the fix and evidence (reproducing test now passing, build green), then
+   **release** the task (`workflow/allocate.sh done <taskId>`). A person still reviews, merges and deploys.
 
 ### 2. Branch — isolate the work
 
@@ -80,10 +104,11 @@ All of this iteration's work (code, tests, examples) stays on that branch; one b
 
 ```bash
 git checkout main && git pull --ff-only          # start from the latest main
-git switch -c feature/<slug>                      # e.g. feature/acceptance; one branch per feature
+git switch -c feature/<slug>                      # feature work; a regression uses bugfix/<taskId>
 ```
 
-If the branch already exists (a retried or resumed feature), switch to it (`git switch feature/<slug>`)
+Feature work uses `feature/<slug>`; a regression bug task uses `bugfix/<taskId>` (e.g.
+`bugfix/bug-ratings-check-3`). If the branch already exists (a retried or resumed task), switch to it
 rather than creating a second one. Never work directly on `main`. Do not push or open a PR unless asked;
 leave the branch local for a person to review and merge (merging to `main` is what deploys).
 
@@ -198,6 +223,22 @@ Pre-claim gate (house-conventions.md): after deploy, run.sh + adversarial cases 
 Status: on branch feature/<slug>, ready for a person to review, merge to main (which deploys) and claim
 on the harness — agents can't merge, deploy or claim.
 Evidence: passing tests above + (once deployed) green harness checks for <slug>.
+```
+
+For a **regression bug task**, emit a bug report instead of the feature shape:
+
+```
+## Bug: <taskId>  (<feature>/<check> FAULTY, tick <n>, <YYYY-MM-DD>)
+
+Problem: <method> <templated path> -> our service answered <...>; the <feature> spec expects <...>.
+Root cause: <hypothesis / confirmed cause>.
+Fix: <what changed, which files>.
+Reproduce: <test that fails before / passes after — or why it can't reproduce locally>.
+Build: ./mvnw package -> SUCCESS (N tests, 0 failures)
+Regression review: no other feature regresses (all prior tests pass).
+Branch: bugfix/<taskId>  (not merged, not pushed)
+Allocation: grabbed via agent-allocations ledger; done at iteration end.
+Status: on branch bugfix/<taskId>, ready for a person to review, merge and deploy.
 ```
 
 ### 9b. Log it in `REVIEW.md` — don't skip
