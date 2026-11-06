@@ -105,6 +105,8 @@ loads at start-up on every machine.
 - `RequestLoggingFilter` + `TalkShapeRegressionTest` / `CompatibilityTest`: request logging and
   shape-pinning tests make a framework migration (Boot 2.7 → 4) safe.
 
+- [`.claude/rules/house-conventions.md`](.claude/rules/house-conventions.md): principles distilled from every harness fault (status-code precedence, repeats by meaning, no connection state, invariants enforced by the DB), plus a **requirements review built into the loop**: a requirements table before code, an independent reviewer agent that sees only the spec and the diff before hand-over, and a pre-claim gate against the deployed URL. Reusable on any "the request isn't a spec" project.
+
 ## 6. One thing we'd do differently
 
 Start the running log in the loop from minute one. We built a careful spec-to-report loop, but none
