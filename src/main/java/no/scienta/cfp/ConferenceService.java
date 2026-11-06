@@ -214,7 +214,7 @@ public class ConferenceService {
             long[] stats = byTalk.get(t.id);
             int count = stats == null ? 0 : (int) stats[0];
             t.ratingCount = count;
-            t.averageRating = count == 0 ? null : calculateAverage(stats[1], count);
+            t.averageRating = count == 0 ? null : calculateAverage(stats[1], count, stats[2], stats[3]);
         }
     }
 
@@ -226,10 +226,20 @@ public class ConferenceService {
         return ids;
     }
 
-    // 1 decimal, half up (4.25 -> 4.3)
-    private Double calculateAverage(long total, int count) {
-        return BigDecimal.valueOf(total).divide(BigDecimal.valueOf(count), 1, RoundingMode.HALF_UP).doubleValue();
-        // return Utils.roundRating((double) total / count);
+    static final int TRIM_FROM = 5;   // ratings-cr: from 5 ratings, one highest and one lowest score are left out
+
+    /**
+     * The average as shown (ratings-cr): from {@link #TRIM_FROM} ratings, exactly one highest and one lowest score
+     * are left out, even when several reviewers gave that score; below that every score counts. Rounded to 2
+     * decimals with banker's rounding (3.125 -> 3.12, 3.375 -> 3.38). Exact: the sum and count are whole numbers,
+     * so BigDecimal sees the true quotient, never a binary-float approximation of it. ratingCount is unaffected.
+     */
+    static Double calculateAverage(long total, int count, long max, long min) {
+        if (count >= TRIM_FROM) {
+            total -= max + min;
+            count -= 2;
+        }
+        return BigDecimal.valueOf(total).divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_EVEN).doubleValue();
     }
 
     // Fills coSpeakerIds for a list of talks in one query, rather than one per talk (the pool is capped at 5).
