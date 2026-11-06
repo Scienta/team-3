@@ -16,3 +16,4 @@
 {"ts": "2026-11-06T14:28:22Z", "task": "scheduling", "member": "ro@scienta.no", "host": "Runar-xps15", "status": "done"}
 {"ts": "2026-11-06T14:28:58Z", "task": "ratings-cr", "member": "ro@scienta.no", "host": "Runar-xps15", "status": "claimed"}
 {"ts": "2026-11-06T14:32:14Z", "task": "submission-cap-cr", "member": "steinar.haug@gmail.com", "host": "Steinar-sin-MacBook-Pro.local", "status": "claimed"}
+{"ts": "2026-11-06T14:38:02Z", "task": "ratings-cr", "member": "ro@scienta.no", "host": "Runar-xps15", "status": "done"}
