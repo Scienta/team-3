@@ -27,8 +27,8 @@ public class RatingDao {
     }
 
     /**
-     * Returns {talkId: [cnt, total]} for several talks in one query, rather than one per talk (the pool is capped at
-     * 5). Talks nobody has rated are left out.
+     * Returns {talkId: [cnt, total, max, min]} for several talks in one query, rather than one per talk (the pool is
+     * capped at 5). Talks nobody has rated are left out. max/min let the average leave out one of each (ratings-cr).
      */
     public Map<Long, long[]> statsByTalks(List<Long> talkIds) {
         Map<Long, long[]> byTalk = new HashMap<>();
@@ -36,10 +36,11 @@ public class RatingDao {
             return byTalk;
         }
         String placeholders = String.join(",", Collections.nCopies(talkIds.size(), "?"));
-        jdbc.query("SELECT talk_id, COUNT(*) AS cnt, SUM(score) AS total FROM rating WHERE talk_id IN (" + placeholders
+        jdbc.query("SELECT talk_id, COUNT(*) AS cnt, SUM(score) AS total, MAX(score) AS hi, MIN(score) AS lo "
+                        + "FROM rating WHERE talk_id IN (" + placeholders
                         + ") GROUP BY talk_id",
                 rs -> {
-                    byTalk.put(rs.getLong("talk_id"), new long[] {rs.getLong("cnt"), rs.getLong("total")});
+                    byTalk.put(rs.getLong("talk_id"), new long[] {rs.getLong("cnt"), rs.getLong("total"), rs.getLong("hi"), rs.getLong("lo")});
                 },
                 talkIds.toArray());
         return byTalk;

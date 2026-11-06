@@ -110,7 +110,8 @@ public class Utils {
         return true;
     }
 
-    /**
+     * Rounds the /admin/stats mean of the per-talk averages to one decimal, halves up (4.25 -> 4.3). Per-talk averages
+     * themselves are 2 decimals with banker's rounding (ConferenceService.calculateAverage, ratings-cr).
      * Rounds a rating average to one decimal, halves up (4.25 -> 4.3), like the per-talk averages.
      */
     public static double roundRating(double avg) {
