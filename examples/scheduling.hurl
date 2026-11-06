@@ -117,9 +117,9 @@ jsonpath "$.end" == "15:30"
 
 # Bad coordinates and bad body
 GET {{base_url}}/programme/RX/S1
-HTTP 400
+HTTP 404
 GET {{base_url}}/programme/R1/S9
-HTTP 400
+HTTP 404
 PUT {{base_url}}/programme/R1/S3
 {}
 HTTP 400

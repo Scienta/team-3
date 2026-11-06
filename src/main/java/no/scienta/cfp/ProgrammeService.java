@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -73,7 +74,11 @@ public class ProgrammeService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "a speaker is already in another room in slot " + slot);
         }
 
-        programmeDao.place(room, slot, talkId);
+        try {
+            programmeDao.place(room, slot, talkId);
+        } catch (DuplicateKeyException e) {             // the same talk placed in another slot at the same moment
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "talk is already on the programme; take it out first");
+        }
         return entry(room, slot, talkId);
     }
 
@@ -138,11 +143,12 @@ public class ProgrammeService {
     }
 
     private static void requireRoomAndSlot(String room, String slot) {
+        // the room and slot are the resource in the path: one that isn't on the venue (R0, r1, slot2) is a 404
         if (!Venue.isRoom(room)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown room " + room);
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "unknown room " + room);
         }
         if (!Venue.isSlot(slot)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown slot " + slot);
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "unknown slot " + slot);
         }
     }
 

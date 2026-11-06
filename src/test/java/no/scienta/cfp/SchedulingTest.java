@@ -146,8 +146,11 @@ class SchedulingTest {
         assertEquals("13:30", field(e.body(), "start"));
         assertEquals("15:30", field(e.body(), "end"));
 
-        assertEquals(400, get("RX", "S1").statusCode());             // unknown room
-        assertEquals(400, get("R1", "S9").statusCode());             // unknown slot
+        assertEquals(404, get("RX", "S1").statusCode());             // unknown room
+        assertEquals(404, get("R1", "S9").statusCode());             // unknown slot
+        assertEquals(404, get("r1", "S1").statusCode());             // rooms are written exactly R1..R3
+        assertEquals(404, put("R0", "S2", 1L).statusCode());
+        assertEquals(404, put("R2", "slot2", 1L).statusCode());
         assertEquals(400, put("R1", "S1", null).statusCode());       // missing talkId
         assertEquals(404, put("R1", "S1", 99999999L).statusCode());  // unknown talk
     }
