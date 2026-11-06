@@ -98,6 +98,10 @@ to whoever gets the pooled connection next (AGENTS.md).
 ## 5. Coordination
 
 - **Pull before every iteration**, including a quick fix: these rules only protect people who have them.
+- **Merge only what you just built.** Any edit after the last green `./mvnw package`, even a comment, needs
+  a fresh build, and the merge must be gated on it in the same command (`./mvnw package && git merge …`),
+  never run after it with `;`. *(af41c5f: a one-line comment edit after the green build broke compilation;
+  the merge ran anyway and the deploy failed at the build step. Production was unaffected, one deploy lost.)*
 - **Grab before fixing, not only before building.** A FAULTY check is a task: `workflow/allocate.sh grab
   <slug>` first. *(Three collisions in one afternoon, two on the same scheduling check.)*
 
