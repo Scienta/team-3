@@ -275,6 +275,55 @@ public class ConferenceService {
         return getTalk(talkId);
     }
 
+    // ---------------------------------------------------------------- acceptance
+
+    // a talk can still be decided from these states; ACCEPTED/REJECTED are final and WITHDRAWN is out for good
+    private static final List<String> DECIDABLE = Arrays.asList("SUBMITTED", "WAITLISTED");
+    private static final List<String> DECISIONS = Arrays.asList("ACCEPTED", "REJECTED", "WAITLISTED");
+
+    @Transactional
+    public TalkDto decide(long talkId, Map<String, Object> body) {
+        Object status = body == null ? null : body.get("status");
+        if (!(status instanceof String) || !DECISIONS.contains(status)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "status must be one of " + DECISIONS);
+        }
+        String target = (String) status;
+        String current = talkDao.lockStatus(talkId);        // row lock: concurrent deciders are serialised
+        if (current == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
+        }
+        if (!DECIDABLE.contains(current)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "a " + current + " talk cannot be decided again");
+        }
+        if (target.equals("ACCEPTED") && ratingDao.distinctReviewers(talkId) < 2) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "a talk needs at least two reviewers to be accepted");
+        }
+        talkDao.updateStatus(talkId, target);
+        return getTalk(talkId);
+    }
+
+    @Transactional
+    public TalkDto withdraw(long talkId, Map<String, Object> body) {
+        Object sid = body == null ? null : body.get("speakerId");
+        if (!(sid instanceof Number)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "speakerId is required");
+        }
+        long speakerId = ((Number) sid).longValue();
+        String current = talkDao.lockStatus(talkId);        // row lock: serialise against concurrent decisions
+        if (current == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "talk not found");
+        }
+        TalkDto talk = talkDao.findById(talkId);
+        if (talk.speakerId != speakerId) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "only the speaker can withdraw their own talk");
+        }
+        if (current.equals("REJECTED") || current.equals("WITHDRAWN")) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "a " + current + " talk cannot be withdrawn");
+        }
+        talkDao.updateStatus(talkId, "WITHDRAWN");
+        return getTalk(talkId);
+    }
+
     // ---------------------------------------------------------------- statistics
 
     public Map<String, Object> statistics() {

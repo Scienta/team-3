@@ -53,6 +53,19 @@ public class TalkDao {
     }
 
     /**
+     * Takes a row lock on the talk and returns its current status, or null if there is no such talk.
+     * Call inside the decide/withdraw transaction so two committee members can't both act on one state.
+     */
+    public String lockStatus(long id) {
+        List<String> s = jdbc.queryForList("SELECT status FROM talk WHERE id = ? FOR UPDATE", String.class, id);
+        return s.isEmpty() ? null : s.get(0);
+    }
+
+    public void updateStatus(long id, String status) {
+        jdbc.update("UPDATE talk SET status = ? WHERE id = ?", status, id);
+    }
+
+    /**
      * Inserts the talk only if the speaker has fewer than {@code max} talks. Returns the new id, or null.
      * The speaker row is locked first so two submissions for the same speaker can't both see room under the limit.
      */

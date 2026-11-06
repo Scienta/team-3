@@ -30,6 +30,12 @@ public class RatingDao {
         return jdbc.queryForMap("SELECT COUNT(*) AS cnt, COALESCE(SUM(score), 0) AS total FROM rating WHERE talk_id = ?", talkId);
     }
 
+    /** How many different reviewers rated this talk (one reviewer who rated twice counts once). */
+    public int distinctReviewers(long talkId) {
+        Integer n = jdbc.queryForObject("SELECT COUNT(DISTINCT reviewer_id) FROM rating WHERE talk_id = ?", Integer.class, talkId);
+        return n == null ? 0 : n;
+    }
+
     // public double average(long talkId) {
     //     return jdbc.queryForObject("SELECT AVG(score) FROM rating WHERE talk_id = ?", Double.class, talkId);
     // }
