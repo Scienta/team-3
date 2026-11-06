@@ -82,6 +82,8 @@ to whoever gets the pooled connection next (AGENTS.md).
   loops over many rows) inside a transaction that holds a lock.
 - **One instance, scales to zero, ~1 tick of FAULTY checks per code deploy.** Batch code merges; docs and
   `examples/` don't deploy.
+  `deploy.yml` waits for second :34 before the roll-out, so the instance switch lands in the harness's quiet
+  window (:15-:54); a switch inside its burst (:55-:14) failed a tick on every feature. Don't remove that step.
 
 ## 4. Invariants and concurrency
 

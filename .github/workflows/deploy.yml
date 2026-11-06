@@ -64,6 +64,16 @@ jobs:
           docker build --platform linux/amd64 --build-arg "GIT_SHA=$SHA" --tag "$IMAGE:$SHA" --tag "$IMAGE:latest" .
           docker push "$IMAGE:$SHA"
           docker push "$IMAGE:latest"
+      # The harness sends all its traffic from second :55 to :14 of every minute and nothing from :15 to :54.
+      # The switch from the old instance to the new one lands 49-66 s after the roll-out starts (measured on
+      # six deploys at 14:06-14:36), and every switch inside the busy window failed that tick's checks on
+      # every feature. Starting at :34 puts the switch at about :23-:40, in the quiet window.
+      - name: Wait for the harness's quiet window
+        run: |
+          now=$(date -u +%-S); wait=$(( (34 - now + 60) % 60 ))
+          echo "UTC second $now; waiting ${wait}s so the instance switch lands between harness bursts"
+          sleep "$wait"
+          date -u +"Roll-out starts at %H:%M:%S"
       - name: Roll out
         id: rollout
         env:
